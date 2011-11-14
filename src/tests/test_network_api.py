@@ -26,70 +26,63 @@ import unittest
 import time
 import sys
 
-connection = None
-network = None
-err = sys.stderr
+qmf = None
 
 # Initialization
 # =====================================================
-def setUp(self):
-    global network
-    global connection
+def setUpModule():
+    global connection, qmf
     connection = NetworkTestsSetup()
-    network = connection.network
+    qmf = connection.qmf
 
-def tearDown():
-    testUtil.disconnectFromBroker(connection.connect_info)
+def tearDownModule():
+    global connection
+    connection.tearDown()
 
-class NetworkTestsSetup(object):
+class NetworkTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        cmd.getoutput("service matahari-broker start")
-        cmd.getoutput("service matahari-network start")
-        time.sleep(3)
-        self.expectedMethods = [ 'list()', 'start(iface)', 'stop(iface)', 'status(iface)', 'get_ip_address(iface)', 'get_mac_address(iface)' ]
-        self.connect_info = testUtil.connectToBroker('localhost','49000')
-        self.sess = self.connect_info[1]
-        self.reQuery()
-        self.nic_ut = self.select_nic_for_test()
-    def disconnect(self):
-        testUtil.disconnectFromBroker(self.connect_info)
-    def reQuery(self):
-        self.network = testUtil.findAgent(self.sess,'Network', 'Network', cmd.getoutput('hostname'))
-        self.props = self.network.getProperties()
-    def ifconfig_nic_list(self):
-        list = cmd.getoutput("ifconfig | grep 'Link encap:' | awk '{print $1}' | tr '\n' '|'").rsplit('|')
-        list.pop()
-        return list
-    def select_nic_for_test(self):
-        nic_list = self.ifconfig_nic_list()
-        known_list = ["eth2", "eth1", "eth0", "em2", "em1", "em0"]
-        for i in known_list:
-            if i in nic_list:
-                return i
-        print "Error determining NIC for testing."
-        sys.exit(1)
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-networkd", "Network", "Network")
+
+        self.nic_ut = cmd.getoutput("ifconfig | grep 'Link encap:' | awk '{print $1}' | tr '\n' '|'").rsplit('|')
+        self.nic_ut.pop()
+
+def ifconfig_nic_list():
+    nic_list = cmd.getoutput("ifconfig | grep 'Link encap:' | awk '{print $1}' | tr '\n' '|'").rsplit('|')
+    nic_list.pop()
+    return nic_list
+
+def select_nic_for_test():
+    nic_list = ifconfig_nic_list()
+    known_list = ["eth2", "eth1", "eth0", "em2", "em1", "em0"]
+    for i in known_list:
+        if i in nic_list:
+            return i
+    print "Error determining NIC for testing."
+    sys.exit(1)
 
 
 class TestNetworkApi(unittest.TestCase):
+    def setUp(self):
+        self.nic_ut = select_nic_for_test()
 
     # TEARDOWN
     # ================================================================
     def tearDown(self):
-        list = connection.ifconfig_nic_list()
-        if connection.nic_ut not in list:
-            cmd.getoutput("ifup " + connection.nic_ut)
+        list = ifconfig_nic_list()
+        if self.nic_ut not in list:
+            cmd.getoutput("ifup " + self.nic_ut)
             time.sleep(3)
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = connection.props.get('hostname')
+        value = qmf.props.get('hostname')
         self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")
 
     # TEST - list()
     # =====================================================
     def test_nic_list(self):
-        result = network.list()
+        result = qmf.list()
         found_list = result.get("iface_map")
         output = cmd.getoutput("cat /proc/net/dev | awk '{print $1}' | grep : | sed 's/^\(.*\):\{1\}.*$/\\1/' | tr '\n' '|'").rsplit('|')
         output.pop()
@@ -104,99 +97,99 @@ class TestNetworkApi(unittest.TestCase):
     # TEST - start()
     # ================================================================
     def test_nic_start(self):
-        nic_ut = connection.nic_ut
+        nic_ut = self.nic_ut
         # first, make sure it is stopped
         cmd.getoutput("ifdown " + nic_ut)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nic_ut in list:
             self.fail("pre-req error: " + nic_ut + " not stopping for start test")
         else:
             # do test
-            results = network.start(nic_ut)
+            results = qmf.start(nic_ut)
             #print "OUTPUT:",strt
         # verify up
         time.sleep(3)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nic_ut not in list:
             self.fail(nic_ut + " not stopping for start test")
 
     def test_nic_start_bad_value(self):
-        results = network.start("bad")
+        results = qmf.start("bad")
         self.assertTrue(results.get('status') == 1, "")
 
     # TEST - stop()
     # ================================================================
     def test_nic_stop(self):
-        nic_ut = connection.nic_ut
+        nic_ut = self.nic_ut
         cmd.getoutput("ifup " + nic_ut)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nic_ut not in list:
             self.fail("pre-req error: " + nic_ut + " not started for stop test")
         else:
             # do test
-            result = network.stop(nic_ut)
+            result = qmf.stop(nic_ut)
         # verify down
         time.sleep(3)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nic_ut in list:
             self.fail(nic_ut + " did not stop")
 
     def test_nic_stop_bad_value(self):
-        results = network.stop("bad")
+        results = qmf.stop("bad")
         self.assertTrue(results.get('status') == 1, "")
 
     # TEST - status()
     # ================================================================
     def test_nic_stop_status(self):
-        nut = connection.nic_ut
+        nut = self.nic_ut
         cmd.getoutput("ifdown " + nut)
         time.sleep(3)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nut in list:
             self.fail("pre-req error: " + nut + " not started for stop test")
-        result = network.status(nut)
+        result = qmf.status(nut)
         stop_value = result.get("status")
         self.assertTrue(stop_value == 1, "")
 
     def test_nic_start_status(self):
-        nic_ut = connection.nic_ut
+        nic_ut = self.nic_ut
         cmd.getoutput("ifup " + nic_ut)
-        list = connection.ifconfig_nic_list()
+        list = ifconfig_nic_list()
         if nic_ut not in list:
             self.fail("pre-req error: " + nic_ut + " not started for stop test")
-        result = network.status(nic_ut)
+        result = qmf.status(nic_ut)
         start_value = result.get("status")
         self.assertTrue(start_value == 0, "")
 
     def test_nic_status_bad_value(self):
-        results = network.status("bad")
+        results = qmf.status("bad")
         self.assertTrue(results.get('status') == 1, "")
 
     # TEST - get_ip_address()
     # ================================================================
     def test_get_ip_address(self):
-        nic_ut = connection.nic_ut
+        nic_ut = self.nic_ut
         output = cmd.getoutput("ifconfig "+nic_ut+" | grep 'inet addr' | gawk -F: '{print $2}' | gawk '{print $1}'")
-        result = network.get_ip_address(nic_ut)
+        result = qmf.get_ip_address(nic_ut)
         ip_value = result.get("ip")
         if output == "":
             output = "0.0.0.0"
         self.assertTrue(output == ip_value, str(output) + " != " + str(ip_value))
 
     def test_get_ip_addr_bad_value(self):
-        results = network.get_ip_address("bad")
+        results = qmf.get_ip_address("bad")
         self.assertTrue(results.get('ip') == '', "Bad IP TEST, expecting empty string")
 
     # TEST - get_mac_address()
     # ================================================================
     def test_get_mac_address(self):
-        nic_ut = connection.nic_ut
-        result = network.get_mac_address(nic_ut)
+        nic_ut = self.nic_ut
+        result = qmf.get_mac_address(nic_ut)
         mac_value = result.get("mac")
         output = cmd.getoutput("ifconfig "+nic_ut+" | grep 'HWaddr' | sed 's/^.*HWaddr \(.*\)\{1\}.*$/\\1/'").strip()
         self.assertTrue(output == mac_value, str(output) + " != " + str(mac_value))
 
     def test_get_mac_addr_bad_value(self):
-        results = network.get_mac_address("bad")
+        results = qmf.get_mac_address("bad")
         self.assertTrue(results.get('mac') == '', "Expected empty string")
 

@@ -34,32 +34,59 @@ import string
 import subprocess
 import logging
 
+class TestsSetup(object):
+    def __init__(self, qmf_binary, agentKeyword, agentClass):
+        self.broker = MatahariBroker()
+        self.broker.start()
+        time.sleep(3)
+        self.qmf_agent = MatahariAgent(qmf_binary)
+        self.qmf_agent.start()
+        time.sleep(3)
+
+        self._connectToBroker('localhost', '49001')
+
+        self.agentKeyword = agentKeyword
+        self.agentClass = agentClass
+        self.reQuery()
+
+    def tearDown(self):
+        self._disconnect()
+        self.qmf_agent.stop()
+        self.broker.stop()
+
+    def _disconnect(self):
+        self.connection.close()
+        self.session.close()
+
+    def reQuery(self):
+        self.qmf = self._findAgent(cmd.getoutput('hostname'))
+        self.qmf.props = self.qmf.getProperties()
+
+    def _findAgent(self, hostname):
+        loop_count = 0
+        while loop_count < 70:
+            agents = self.session.getAgents()
+            sys.stderr.write("Agents: %s\n" % str(agents))
+            for agent in agents:
+                if self.agentKeyword in str(agent):
+                    if agent.getAttributes().get('hostname') == hostname:
+                        objs = agent.query("{class:" + self.agentClass + ",package:'org.matahariproject'}")
+                        if objs and len(objs):
+                            return objs[0]
+            time.sleep(1)
+            loop_count = loop_count + 1
+        sys.exit("specific " + self.agentKeyword + " agent for " + hostname + " not found.")
+
+
+    def _connectToBroker(self, hostname, port):
+        self.connection = cqpid.Connection(hostname + ":" + port)
+        self.connection.open()
+        self.session = ConsoleSession(self.connection)
+        self.session.open()
+
+
 # QMF
 # ========================================================
-def disconnectFromBroker(connection_info):
-    connection_info[1].close()
-    connection_info[0].close()
-
-def connectToBroker(hostname, port):
-    connection = cqpid.Connection(hostname + ":" + port)
-    connection.open()
-    session = ConsoleSession(connection)
-    session.open()
-    return [ connection, session ]
-
-def findAgent(session,agentKeyWord,agentClass,hostname):
-    loop_count = 0
-    while loop_count < 70:
-        agents = session.getAgents()
-        for agent in agents:
-            if agentKeyWord in str(agent):
-                if agent.getAttributes().get('hostname') == hostname:
-                    objs = agent.query("{class:"+agentClass+",package:'org.matahariproject'}")
-                    if objs and len(objs):
-                        return objs[0]
-        time.sleep(1)
-        loop_count = loop_count + 1
-    sys.exit("specific " + agentKeyWord + " agent for " + hostname + " not found.")
 
 def restartService(serviceName):
     cmd.getoutput("service " + serviceName + " restart")

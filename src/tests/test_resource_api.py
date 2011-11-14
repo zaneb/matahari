@@ -29,61 +29,41 @@ import sys
 import os
 
 connection = None
-resource = None
-err = sys.stderr
+qmf = None
 
 # Initialization
 # =====================================================
-def setUp(self):
-    global resource
+def setUpModule():
+    global connection, qmf
+
+    connection = ResourcesTestsSetup()
+    qmf = connection.qmf
+
+def tearDownModule():
     global connection
-    connection = ResourceTestsSetup()
-    resource = connection.resource
+    connection.tearDown()
 
-def tearDown():
-    connection.teardown()
-
-class ResourceTestsSetup(object):
+class ResourcesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        self.broker = testUtil.MatahariBroker()
-        self.broker.start()
-        time.sleep(3)
-        self.service_agent = testUtil.MatahariAgent("matahari-qmf-serviced")
-        self.service_agent.start()
-        time.sleep(3)
-        self.expectedMethods = [ 'list_standards()', 'list_providers(standard)', 'list(standard, provider)', 'describe(standard, provider, agent)',
-                                 'invoke(name, standard, provider, agent, action, interval, parameters, timeout, expected-rc, userdata)',
-                                 'cancel(name, action, interval, timeout)', 'fail(name, rc)' ]
-        self.connect_info = testUtil.connectToBroker('localhost','49001')
-        self.sess = self.connect_info[1]
-        self.reQuery()
-
-    def teardown(self):
-        testUtil.disconnectFromBroker(self.connect_info)
-        self.service_agent.stop()
-        self.broker.stop()
-
-    def reQuery(self):
-        self.resource = testUtil.findAgent(self.sess,'service', 'Resources', cmd.getoutput('hostname'))
-        self.props = self.resource.getProperties()
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Resources")
 
 class TestResourceApi(unittest.TestCase):
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = connection.props.get('hostname')
+        value = qmf.props.get('hostname')
         self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")
 
     # TEST - fail()
     # =====================================================
     def test_fail_not_implemented(self):
-        self.assertRaises(QmfAgentException, resource.fail, "crond", 0)
+        self.assertRaises(QmfAgentException, qmf.fail, "crond", 0)
 
     # TEST - describe()
     # =====================================================
     def test_describe_not_implemented(self):
-        self.assertRaises(QmfAgentException, resource.describe, 'ocf','heartbeat','IPaddr')
+        self.assertRaises(QmfAgentException, qmf.describe, 'ocf','heartbeat','IPaddr')
 
     # TEST - describe()
     # =====================================================

@@ -26,48 +26,27 @@ import time
 import sys
 from qmf2 import QmfAgentException
 
-connection = None
-network = None
-err = sys.stderr
+qmf = None
 
 # Initialization
 # =====================================================
-def setUp(self):
-    global network
-    global connection
+def setUpModule():
+    global connection, qmf
     connection = NetworkTestsSetup()
-    network = connection.network
+    qmf = connection.qmf
 
-def tearDown():
-    connection.teardown()
+def tearDownModule():
+    global connection
+    connection.tearDown()
 
-class NetworkTestsSetup(object):
+class NetworkTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        self.broker = testUtil.MatahariBroker()
-        self.broker.start()
-        time.sleep(3)
-        self.network_agent = testUtil.MatahariAgent("matahari-qmf-networkd")
-        self.network_agent.start()
-        time.sleep(3)
-        self.expectedMethods = [ 'list()', 'start(iface)', 'stop(iface)', 'status(iface)', 'get_ip_address(iface)', 'get_mac_address(iface)' ]
-        self.connect_info = testUtil.connectToBroker('localhost','49001')
-        self.sess = self.connect_info[1]
-        self.reQuery()
-
-    def teardown(self):
-        testUtil.disconnectFromBroker(self.connect_info)
-        self.network_agent.stop()
-        self.broker.stop()
-
-    def reQuery(self):
-        self.network = testUtil.findAgent(self.sess,'Network', 'Network', cmd.getoutput('hostname'))
-        self.props = self.network.getProperties()
-
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-networkd", "Network", "Network")
 
 class TestNetworkApi(unittest.TestCase):
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = connection.props.get('hostname')
+        value = qmf.props.get('hostname')
         self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")

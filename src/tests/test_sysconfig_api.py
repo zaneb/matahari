@@ -64,7 +64,7 @@ puppetFileContents = "file { \""+testPuppetFileWithPath+"\":\n    owner => "+tar
 augeasQuery = "/files/etc/mtab/1/spec"
 augeasFileContents = "get %s\n" % augeasQuery
 connection = None
-sysconfig = None
+qmf = None
 httpd_thread = None
 
 
@@ -86,9 +86,9 @@ def wrapper(method, value, flag, schema, key):
         resetTestFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup, puppetFileContents)
     results = None
     if method == 'uri':
-        results = sysconfig.run_uri(value, flag, schema, key)
+        results = qmf.run_uri(value, flag, schema, key)
     elif method == 'string':
-       results = sysconfig.run_string(value, flag, schema, key)
+       results = qmf.run_string(value, flag, schema, key)
     return results
 
 def checkFile(file, perms, owner, grp):
@@ -121,8 +121,8 @@ class HTTPThread(threading.Thread):
 
 # Initialization
 # =====================================================
-def setUp(self):
-    global httpd_thread
+def setUpModule():
+    global httpd_thread, connection, qmf
     httpd_thread = HTTPThread()
     httpd_thread.start()
 
@@ -133,57 +133,26 @@ def setUp(self):
         if result[0] != 0:
             sys.exit("Unable to install puppet (required for sysconfig tests)")
 
-    # make connection
-    global sysconfig
-    global connection
-    connection = SysconfigSetup()
-    sysconfig = connection.sysconfig
+    connection = SysconfigTestsSetup()
+    qmf = connection.qmf
 
-
-def tearDown():
-    testUtil.disconnectFromBroker(connection.connect_info)
+def tearDownModule():
     global connection
-    connection.teardown()
-    global httpd_thread
+    connection.tearDown()
     httpd_thread.httpd.shutdown()
     httpd_thread.httpd.server_close()
     httpd_thread.join()
 
-
-class SysconfigSetup(object):
+class SysconfigTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        self.broker = testUtil.MatahariBroker()
-        self.broker.start()
-        time.sleep(3)
-        self.sysconfig_agent = testUtil.MatahariAgent("matahari-qmf-sysconfigd")
-        self.sysconfig_agent.start()
-        time.sleep(3)
-        self.expectedMethods = [ 'run_uri(uri, flags, scheme, key)',
-                                 'run_string(text, flags, scheme, key)',
-                                 'query(text, flags, scheme)',
-                                 'is_configured(key)' ]
-        self.connect_info = testUtil.connectToBroker('localhost','49001')
-        self.sess = self.connect_info[1]
-        self.reQuery()
-
-    def teardown(self):
-        self.sysconfig_agent.stop()
-        self.broker.stop()
-
-    def disconnect(self):
-        testUtil.disconnectFromBroker(self.connect_info)
-
-    def reQuery(self):
-        self.sysconfig = testUtil.findAgent(self.sess,'Sysconfig','Sysconfig',cmd.getoutput("hostname"))
-        self.props = self.sysconfig.getProperties()
-
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-sysconfigd", "Sysconfig", "Sysconfig")
 
 class TestSysconfigApi(unittest.TestCase):
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = connection.props.get('hostname')
+        value = qmf.props.get('hostname')
         self.assertTrue( value == cmd.getoutput("hostname"), "hostname not expected")
 
     # TODO:
@@ -215,7 +184,7 @@ class TestSysconfigApi(unittest.TestCase):
 
     def test_run_uri_bad_puppet_manifest(self):
         resetTestFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup, 'bad puppet script')
-        results = sysconfig.run_uri(testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
+        results = qmf.run_uri(testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
         self.assertTrue( results.get('status') == 'FAILED\n1', "result: " + str(results.get('status')) + " != FAILED\n1")
         self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
 
@@ -296,12 +265,12 @@ class TestSysconfigApi(unittest.TestCase):
     # ================================================================
     @attr('augeas')
     def test_query_good_augeas(self):
-        result = sysconfig.query(augeasQuery, 0, 'augeas').get('data')
+        result = qmf.query(augeasQuery, 0, 'augeas').get('data')
         self.assertNotEqual(result, 'unknown', "result: %s == unknown" % result)
 
     @attr('augeas')
     def test_query_bad_augeas(self):
-        result = sysconfig.query('bad augeas query', 0, 'augeas').get('data')
+        result = qmf.query('bad augeas query', 0, 'augeas').get('data')
         self.assertEqual(result, 'unknown', "result: %s != unknown" % result)
 
     # TEST - is_configured()
@@ -309,15 +278,15 @@ class TestSysconfigApi(unittest.TestCase):
     def test_is_configured_known_key(self):
         key = testUtil.getRandomKey(5)
         wrapper('uri',testPuppetFileUrl, 0, 'puppet', key)
-        results = sysconfig.is_configured(key)
+        results = qmf.is_configured(key)
         self.assertTrue( results.get('status') == 'OK', "result: " + str(results.get('status')) + " != OK")
 
     def test_is_configured_unknown_key(self):
-        results = sysconfig.is_configured(testUtil.getRandomKey(5))
+        results = qmf.is_configured(testUtil.getRandomKey(5))
         self.assertTrue( results.get('status') == 'unknown', "result: " + str(results.get('status')) + " != unknown")
 
     def test_is_configured_failed_key(self):
         key = testUtil.getRandomKey(5)
         wrapper('string', "bad puppet manifest", 0, 'puppet', key)
-        tokens = sysconfig.is_configured(key).get('status').split('\n')
+        tokens = qmf.is_configured(key).get('status').split('\n')
         self.assertTrue(tokens[0] == 'FAILED', "result: %s != FAILED" % tokens[0])

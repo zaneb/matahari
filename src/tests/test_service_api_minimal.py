@@ -32,36 +32,18 @@ err = sys.stderr
 
 # Initialization
 # =====================================================
-def setUp(self):
-    global service
-    global connection
+def setUpModule():
+    global connection, qmf
     connection = ServicesTestsSetup()
-    service = connection.service
+    qmf = connection.qmf
 
-def tearDown():
-    connection.teardown()
+def tearDownModule():
+    global connection
+    connection.tearDown()
 
-class ServicesTestsSetup(object):
+class ServicesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        self.broker = testUtil.MatahariBroker()
-        self.broker.start()
-        time.sleep(3)
-        self.service_agent = testUtil.MatahariAgent("matahari-qmf-serviced")
-        self.service_agent.start()
-        time.sleep(3)
-        self.expectedMethods = [ 'list()', 'enable(name)', 'disable(name)', 'start(name, timeout)', 'stop(name, timeout)', 'status(name, timeout)', 'describe(name)' ]
-        self.connect_info = testUtil.connectToBroker('localhost','49001')
-        self.sess = self.connect_info[1]
-        self.reQuery()
-
-    def teardown(self):
-        testUtil.disconnectFromBroker(self.connect_info)
-        self.service_agent.stop()
-        self.broker.stop()
-
-    def reQuery(self):
-        self.service = testUtil.findAgent(self.sess,'service', 'Services', cmd.getoutput('hostname'))
-        self.props = self.service.getProperties()
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Services")
 
 
 class TestServicesApi(unittest.TestCase):
@@ -69,5 +51,5 @@ class TestServicesApi(unittest.TestCase):
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = connection.props.get('hostname')
+        value = qmf.props.get('hostname')
         self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")
