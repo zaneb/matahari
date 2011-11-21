@@ -40,7 +40,7 @@
 #define NETWORK_INTERFACE_NAME "org.matahariproject.Network"
 
 
-enum status { INACTIVE = 0, RUNNING };
+enum status { RUNNING = 0, INACTIVE };
 
 /* Get status of the interface */
 static enum status

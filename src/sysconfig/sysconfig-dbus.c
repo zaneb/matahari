@@ -45,17 +45,10 @@ void result_cb(void *data, int result)
 {
     struct AsyncCBData *asynccb = (struct AsyncCBData *) data;
     char *status;
-    GError* error = NULL;
 
-    if (result == MH_RES_SUCCESS) {
-        status = mh_sysconfig_is_configured(asynccb->key);
-        dbus_g_method_return(asynccb->context, status);
-        free(status);
-    } else {
-        error = g_error_new(MATAHARI_ERROR, result, mh_result_to_str(result));
-        dbus_g_method_return_error(asynccb->context, error);
-        g_error_free(error);
-    }
+    status = mh_sysconfig_is_configured(asynccb->key);
+    dbus_g_method_return(asynccb->context, status);
+    free(status);
     free(asynccb->key);
     free(asynccb);
 }
@@ -142,7 +135,7 @@ Sysconfig_query(Matahari* matahari, const char *text, uint flags,
 
     status = mh_sysconfig_query(text, flags, scheme);
 
-    dbus_g_method_return(context, status);
+    dbus_g_method_return(context, status ? status : "unknown");
     free(status);
     return TRUE;
 }
@@ -162,7 +155,7 @@ Sysconfig_is_configured(Matahari* matahari, const char *key,
 
     status = mh_sysconfig_is_configured(key);
 
-    dbus_g_method_return(context, status);
+    dbus_g_method_return(context, status ? status : "unknown");
     free(status);
     return TRUE;
 }
