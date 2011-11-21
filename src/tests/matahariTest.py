@@ -34,33 +34,60 @@ import string
 import subprocess
 import logging
 
+haveDBus = True
+try:
+    import dbus
+except ImportError:
+    sys.stderr.write("Unable to find dbus-python module, DBus tests will be disabled\n")
+    haveDBus = False
+
+
 class TestsSetup(object):
-    def __init__(self, qmf_binary, agentKeyword, agentClass):
+    def __init__(self, qmf_binary, agentKeyword, agentClass, dbus_binary=None, dbus_settings=[]):
         self.broker = MatahariBroker()
         self.broker.start()
         time.sleep(3)
-        self.qmf_agent = MatahariAgent(qmf_binary)
+        self.qmf_agent = MatahariQMFAgent(qmf_binary)
         self.qmf_agent.start()
+
+        if dbus_binary is None:
+            global haveDBus
+            haveDBus = False
+        if haveDBus:
+            self.dbus_agent = MatahariDBusAgent(dbus_binary)
+            self.dbus_agent.start()
+        else:
+            self.dbus_agent = None
+
         time.sleep(3)
 
         self._connectToBroker('localhost', '49001')
+        if haveDBus:
+            self.dbus = MatahariDBusObject(*dbus_settings)
+        else:
+            self.dbus = None
 
         self.agentKeyword = agentKeyword
         self.agentClass = agentClass
+        self.qmf = self._findAgent(cmd.getoutput('hostname'))
         self.reQuery()
 
     def tearDown(self):
         self._disconnect()
+        if self.dbus_agent is not None:
+            self.dbus_agent.stop()
         self.qmf_agent.stop()
         self.broker.stop()
 
     def _disconnect(self):
-        self.connection.close()
         self.session.close()
+        self.connection.close()
 
     def reQuery(self):
-        self.qmf = self._findAgent(cmd.getoutput('hostname'))
+        self.qmf.update()
         self.qmf.props = self.qmf.getProperties()
+        if haveDBus:
+            self.dbus.reQuery()
 
     def _findAgent(self, hostname):
         loop_count = 0
@@ -85,11 +112,29 @@ class TestsSetup(object):
         self.session.open()
 
 
-# QMF
-# ========================================================
-
 def restartService(serviceName):
     cmd.getoutput("service " + serviceName + " restart")
+
+# DBus
+# ========================================================
+class MatahariDBusObject(object):
+    def __init__(self, bus_name, object_path, interface):
+        self.interface = interface
+        bus = dbus.SystemBus()
+        self.obj = bus.get_object(bus_name, object_path)
+        self.iface = dbus.Interface(self.obj, dbus_interface=interface)
+
+        self.reQuery()
+
+    def reQuery(self):
+        # Properties
+        self.props = self.obj.GetAll(self.interface, dbus_interface='org.freedesktop.DBus.Properties')
+
+    def get(self, prop):
+        return self.props[prop]
+
+    def __getattr__(self, attr):
+        return self.iface.get_dbus_method(attr)
 
 # Files
 # ========================================================
@@ -135,38 +180,13 @@ def getRandomKey(length):
     return ''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(length))
 
 
-class MatahariBroker(object):
-    def __init__(self):
-        self.broker = None
-
-    def start(self):
-        sys.stderr.write("Starting broker ...\n")
-        self.broker = subprocess.Popen("qpidd --auth no --port 49001",
-                                       shell=True, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE)
-
-    def stop(self):
-        sys.stderr.write("Stopping broker ...\n")
-        self.broker.terminate()
-        output, output_err = self.broker.communicate()
-        sys.stderr.write("********** Stopped Broker, stdout follows: *************\n")
-        sys.stderr.write(output + "\n")
-        sys.stderr.write("********************************************************\n")
-        sys.stderr.write("********** Stopped Broker, stderr follows: *************\n")
-        sys.stderr.write(output_err + "\n")
-        sys.stderr.write("********************************************************\n")
-
 class MatahariAgent(object):
     def __init__(self, agent_name):
         self.agent_name = agent_name
         self.agent = None
 
     def start(self):
-        sys.stderr.write("Starting %s ...\n" % self.agent_name)
-        self.agent = subprocess.Popen("%s --reconnect yes --broker 127.0.0.1 "
-                                      "--port 49001 -vvv" % self.agent_name,
-                                      shell=True, stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
+        raise NotImplementedError("Method start() is not implemented")
 
     def stop(self):
         sys.stderr.write("Stopping %s ...\n" % self.agent_name)
@@ -180,3 +200,30 @@ class MatahariAgent(object):
                      self.agent_name)
         sys.stderr.write(output_err + "\n")
         sys.stderr.write("********************************************************\n")
+
+class MatahariBroker(MatahariAgent):
+    def __init__(self):
+        MatahariAgent.__init__(self, "broker")
+
+    def start(self):
+        sys.stderr.write("Starting broker ...\n")
+        self.agent = subprocess.Popen(["qpidd", "--auth", "no", "--port", "49001"],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+
+class MatahariQMFAgent(MatahariAgent):
+    def start(self):
+        sys.stderr.write("Starting %s ...\n" % self.agent_name)
+        self.agent = subprocess.Popen([self.agent_name, "--reconnect", "yes",
+                                       "--broker", "127.0.0.1", "--port", "49001", "-v"],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
+
+class MatahariDBusAgent(MatahariAgent):
+    def start(self):
+        if self.agent_name is None:
+            return
+        sys.stderr.write("Starting %s ...\n" % self.agent_name)
+        self.agent = subprocess.Popen(["%s" % self.agent_name, "-vvv"],
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)

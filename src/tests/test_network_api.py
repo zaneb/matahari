@@ -27,13 +27,15 @@ import time
 import sys
 
 qmf = None
+dbus = None
 
 # Initialization
 # =====================================================
 def setUpModule():
-    global connection, qmf
+    global connection, qmf, dbus
     connection = NetworkTestsSetup()
     qmf = connection.qmf
+    dbus = connection.dbus
 
 def tearDownModule():
     global connection
@@ -41,13 +43,13 @@ def tearDownModule():
 
 class NetworkTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-networkd", "Network", "Network")
-
-        self.nic_ut = cmd.getoutput("ifconfig | grep 'Link encap:' | awk '{print $1}' | tr '\n' '|'").rsplit('|')
-        self.nic_ut.pop()
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-networkd", "Network", "Network",
+                                           "matahari-dbus-networkd", ("org.matahariproject.Network",
+                                                                      "/org/matahariproject/Network",
+                                                                      "org.matahariproject.Network"))
 
 def ifconfig_nic_list():
-    nic_list = cmd.getoutput("ifconfig | grep 'Link encap:' | awk '{print $1}' | tr '\n' '|'").rsplit('|')
+    nic_list = cmd.getoutput("ip link | grep -v '^  ' | cut -f2 -d: | tr -d ' ' | tr '\n' '|'").rsplit('|')
     nic_list.pop()
     return nic_list
 
@@ -60,6 +62,21 @@ def select_nic_for_test():
     print "Error determining NIC for testing."
     sys.exit(1)
 
+def ifup(dev):
+    ip_link("up", dev)
+
+def ifdown(dev):
+    ip_link("down", dev)
+
+DOWN, UP = 0, 1
+def status(dev):
+    if len(cmd.getoutput('ip link show %s | grep "<.*UP.*>"' % dev)) > 3:
+        return UP
+    else:
+        return DOWN
+
+def ip_link(status, dev):
+    cmd.getoutput("ip link set %s %s" % (status, dev))
 
 class TestNetworkApi(unittest.TestCase):
     def setUp(self):
@@ -68,128 +85,179 @@ class TestNetworkApi(unittest.TestCase):
     # TEARDOWN
     # ================================================================
     def tearDown(self):
-        list = ifconfig_nic_list()
-        if self.nic_ut not in list:
-            cmd.getoutput("ifup " + self.nic_ut)
-            time.sleep(3)
+        pass
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = qmf.props.get('hostname')
-        self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")
+        value = cmd.getoutput("hostname")
+        qmf_value = qmf.props.get('hostname')
+        self.assertEquals(qmf_value, value, "hostname not matching")
+
+        if testUtil.haveDBus:
+            self.assertEquals(str(dbus.get('hostname')), value, "hostname not matching")
 
     # TEST - list()
     # =====================================================
     def test_nic_list(self):
         result = qmf.list()
-        found_list = result.get("iface_map")
+        qmf_found_list = result.get("iface_map")
         output = cmd.getoutput("cat /proc/net/dev | awk '{print $1}' | grep : | sed 's/^\(.*\):\{1\}.*$/\\1/' | tr '\n' '|'").rsplit('|')
         output.pop()
-        self.assertTrue(len(output) == len(found_list), "nic count not matching")
+        self.assertEquals(len(output), len(qmf_found_list), "QMF: nic count not matching")
+        if testUtil.haveDBus:
+            dbus_found_list = dbus.list()
+            self.assertEquals(len(output), len(dbus_found_list), "DBus: nic count not matching")
 
-        for nic in found_list:
-            try:
-                output.index(nic)
-            except:
-                self.fail("nic ("+nic+") not found)")
+        for nic in output:
+            if not nic in qmf_found_list:
+                self.fail("QMF: nic ("+nic+") not found")
+            if testUtil.haveDBus:
+                if not nic in dbus_found_list:
+                    self.fail("DBus: nic ("+nic+") not found")
 
     # TEST - start()
     # ================================================================
-    def test_nic_start(self):
-        nic_ut = self.nic_ut
+    def test_nic_start_qmf(self):
         # first, make sure it is stopped
-        cmd.getoutput("ifdown " + nic_ut)
-        list = ifconfig_nic_list()
-        if nic_ut in list:
-            self.fail("pre-req error: " + nic_ut + " not stopping for start test")
+        ifdown(self.nic_ut)
+        if (status(self.nic_ut) != DOWN):
+            self.fail("pre-req error: " + self.nic_ut + " not stopping for start test")
         else:
             # do test
-            results = qmf.start(nic_ut)
-            #print "OUTPUT:",strt
+            results = qmf.start(self.nic_ut)
         # verify up
         time.sleep(3)
-        list = ifconfig_nic_list()
-        if nic_ut not in list:
-            self.fail(nic_ut + " not stopping for start test")
+        if (status(self.nic_ut) != UP):
+            self.fail("QMF: " + self.nic_ut + " fails to start")
+
+    @unittest.skipIf(not testUtil.haveDBus, "skipping test_nic_start_dbus test")
+    def test_nic_start_dbus(self):
+        # first, make sure it is stopped
+        ifdown(self.nic_ut)
+        if (status(self.nic_ut) != DOWN):
+            self.fail("pre-req error: " + self.nic_ut + " not stopping for start test")
+        else:
+            # do test
+            results = dbus.start(self.nic_ut)
+        # verify up
+        time.sleep(3)
+        if (status(self.nic_ut) != UP):
+            self.fail("DBus: " + self.nic_ut + " fails to start")
 
     def test_nic_start_bad_value(self):
         results = qmf.start("bad")
-        self.assertTrue(results.get('status') == 1, "")
+        self.assertEquals(results.get('status'), 1, "QMF: start of invalid interface returns %d instead of 1" % int(results.get('status')))
+        if testUtil.haveDBus:
+            dbus_value = int(dbus.start('bad'))
+            self.assertEquals(dbus_value, 1, "DBus: start of invalid interface returns %d instead of 1" % dbus_value)
 
     # TEST - stop()
     # ================================================================
-    def test_nic_stop(self):
-        nic_ut = self.nic_ut
-        cmd.getoutput("ifup " + nic_ut)
-        list = ifconfig_nic_list()
-        if nic_ut not in list:
-            self.fail("pre-req error: " + nic_ut + " not started for stop test")
+    def test_nic_stop_qmf(self):
+        ifup(self.nic_ut)
+        if (status(self.nic_ut) != UP):
+            self.fail("pre-req error: " + self.nic_ut + " not started for stop test")
         else:
             # do test
-            result = qmf.stop(nic_ut)
+            result = qmf.stop(self.nic_ut)
         # verify down
         time.sleep(3)
-        list = ifconfig_nic_list()
-        if nic_ut in list:
-            self.fail(nic_ut + " did not stop")
+        if (status(self.nic_ut) != DOWN):
+            self.fail("QMF: " + self.nic_ut + " did not stop")
+
+    @unittest.skipIf(not testUtil.haveDBus, "skipping test_nic_stop_dbus test")
+    def test_nic_stop_dbus(self):
+        ifup(self.nic_ut)
+        if (status(self.nic_ut) != UP):
+            self.fail("pre-req error: " + self.nic_ut + " not started for stop test")
+        else:
+            # do test
+            result = dbus.stop(self.nic_ut)
+        # verify down
+        time.sleep(3)
+        if (status(self.nic_ut) != DOWN):
+            self.fail("DBus: " + self.nic_ut + " did not stop")
 
     def test_nic_stop_bad_value(self):
         results = qmf.stop("bad")
-        self.assertTrue(results.get('status') == 1, "")
+        self.assertEquals(results.get('status'), 1, "QMF: stop of invalid interface returns %d instead of 1" % int(results.get('status')))
+        if testUtil.haveDBus:
+            dbus_value = int(dbus.stop('bad'))
+            self.assertEquals(dbus_value, 1, "DBus: stop of invalid interface returns %d instead of 1" % dbus_value)
 
     # TEST - status()
     # ================================================================
     def test_nic_stop_status(self):
-        nut = self.nic_ut
-        cmd.getoutput("ifdown " + nut)
+        ifdown(self.nic_ut)
         time.sleep(3)
-        list = ifconfig_nic_list()
-        if nut in list:
-            self.fail("pre-req error: " + nut + " not started for stop test")
-        result = qmf.status(nut)
+        if (status(self.nic_ut) != DOWN):
+            self.fail("pre-req error: " + self.nic_ut + " not started for stop test")
+        result = qmf.status(self.nic_ut)
         stop_value = result.get("status")
-        self.assertTrue(stop_value == 1, "")
+        self.assertTrue(stop_value == 1, "QMF: status for stopped interface is not 1")
+
+        if testUtil.haveDBus:
+            result = dbus.status(self.nic_ut)
+            self.assertTrue(result == 1, "DBus: status for stopped interface is not 1")
 
     def test_nic_start_status(self):
-        nic_ut = self.nic_ut
-        cmd.getoutput("ifup " + nic_ut)
-        list = ifconfig_nic_list()
-        if nic_ut not in list:
-            self.fail("pre-req error: " + nic_ut + " not started for stop test")
-        result = qmf.status(nic_ut)
+        ifup(self.nic_ut)
+        if (status(self.nic_ut) != UP):
+            self.fail("pre-req error: " + self.nic_ut + " not started for stop test")
+        result = qmf.status(self.nic_ut)
         start_value = result.get("status")
-        self.assertTrue(start_value == 0, "")
+        self.assertTrue(start_value == 0, "QMF: status for stopped interface is not 0")
+
+        if testUtil.haveDBus:
+            result = dbus.status(self.nic_ut)
+            self.assertTrue(result == 0, "DBus: status for stopped interface is not 0")
 
     def test_nic_status_bad_value(self):
         results = qmf.status("bad")
-        self.assertTrue(results.get('status') == 1, "")
+        self.assertTrue(results.get('status') == 1, "QMF: status for invalid interface is not 1")
+
+        if testUtil.haveDBus:
+            result = dbus.status("bad")
+            self.assertTrue(result == 1, "DBus: status for invalid interface is not 1")
 
     # TEST - get_ip_address()
     # ================================================================
     def test_get_ip_address(self):
-        nic_ut = self.nic_ut
-        output = cmd.getoutput("ifconfig "+nic_ut+" | grep 'inet addr' | gawk -F: '{print $2}' | gawk '{print $1}'")
-        result = qmf.get_ip_address(nic_ut)
+        output = cmd.getoutput("ifconfig "+self.nic_ut+" | grep 'inet addr' | gawk -F: '{print $2}' | gawk '{print $1}'")
+        result = qmf.get_ip_address(self.nic_ut)
         ip_value = result.get("ip")
         if output == "":
             output = "0.0.0.0"
-        self.assertTrue(output == ip_value, str(output) + " != " + str(ip_value))
+        self.assertTrue(output == ip_value, "QMF: IP (%s) is not equal to ifconfig (%s)" % (str(output), str(ip_value)))
+
+        if testUtil.haveDBus:
+            ip_value = dbus.get_ip_address(self.nic_ut)
+            self.assertTrue(output == ip_value, "DBus: IP (%s) is not equal to ifconfig (%s)" % (str(output), str(ip_value)))
 
     def test_get_ip_addr_bad_value(self):
         results = qmf.get_ip_address("bad")
-        self.assertTrue(results.get('ip') == '', "Bad IP TEST, expecting empty string")
+        self.assertTrue(results.get('ip') == '', "QMF: Bad IP for invalid interface, expecting empty string")
+
+        if testUtil.haveDBus:
+            self.assertTrue(dbus.get_ip_address("bad") == '', "DBus: Bad IP for invalid interface, expecting empty string")
 
     # TEST - get_mac_address()
     # ================================================================
     def test_get_mac_address(self):
-        nic_ut = self.nic_ut
-        result = qmf.get_mac_address(nic_ut)
+        result = qmf.get_mac_address(self.nic_ut)
         mac_value = result.get("mac")
-        output = cmd.getoutput("ifconfig "+nic_ut+" | grep 'HWaddr' | sed 's/^.*HWaddr \(.*\)\{1\}.*$/\\1/'").strip()
-        self.assertTrue(output == mac_value, str(output) + " != " + str(mac_value))
+        output = cmd.getoutput("ifconfig "+self.nic_ut+" | grep 'HWaddr' | sed 's/^.*HWaddr \(.*\)\{1\}.*$/\\1/'").strip()
+        self.assertTrue(output == mac_value, "QMF: MAC (%s) is not equal to ifconfig (%s)" % (str(output), str(mac_value)))
+
+        if testUtil.haveDBus:
+            result = dbus.get_mac_address(self.nic_ut)
+            self.assertTrue(output == result, "DBus: MAC (%s) is not equal to ifconfig (%s)" % (str(output), str(mac_value)))
+
 
     def test_get_mac_addr_bad_value(self):
         results = qmf.get_mac_address("bad")
-        self.assertTrue(results.get('mac') == '', "Expected empty string")
+        self.assertTrue(results.get('mac') == '', "QMF: Bad MAC for invalid interface, expecting empty string")
 
+        if testUtil.haveDBus:
+            self.assertTrue(dbus.get_mac_address('mac') == '', "DBus: Bad MAC for invalid interface, expecting empty string")

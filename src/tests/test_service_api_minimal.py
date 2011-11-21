@@ -26,16 +26,16 @@ import time
 import sys
 from qmf2 import QmfAgentException
 
-connection = None
-service = None
-err = sys.stderr
+qmf = None
+dbus = None
 
 # Initialization
 # =====================================================
 def setUpModule():
-    global connection, qmf
+    global connection, qmf, dbus
     connection = ServicesTestsSetup()
     qmf = connection.qmf
+    dbus = connection.dbus
 
 def tearDownModule():
     global connection
@@ -43,13 +43,20 @@ def tearDownModule():
 
 class ServicesTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Services")
-
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-serviced", "service", "Services",
+                                     "matahari-dbus-serviced", ("org.matahariproject.Services",
+                                                                "/org/matahariproject/Services",
+                                                                "org.matahariproject.Services"))
 
 class TestServicesApi(unittest.TestCase):
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = qmf.props.get('hostname')
-        self.assertEquals(value, cmd.getoutput("hostname"), "hostname not matching")
+        value = cmd.getoutput("hostname")
+        qmf_value = qmf.props.get('hostname')
+        self.assertEquals(qmf_value, value, "QMF hostname not matching")
+
+        if testUtil.haveDBus:
+            dbus_value = dbus.get('hostname')
+            self.assertEquals(dbus_value, value, "DBus hostname not matching")

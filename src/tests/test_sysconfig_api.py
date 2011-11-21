@@ -65,8 +65,11 @@ augeasQuery = "/files/etc/mtab/1/spec"
 augeasFileContents = "get %s\n" % augeasQuery
 connection = None
 qmf = None
+dbus = None
 httpd_thread = None
 
+if testUtil.haveDBus:
+    from dbus import DBusException
 
 def resetTestFile(file, perms, owner, group, contents):
     cmd.getoutput("rm -rf " + file)
@@ -79,16 +82,16 @@ def resetTestFile(file, perms, owner, group, contents):
         sys.exit("problem setting up test file")
     #print "++DONE...checking test file pre-reqs++"
 
-def wrapper(method, value, flag, schema, key):
+def wrapper(module, method, value, flag, schema, key):
     if schema == "augeas":
         resetTestFile(testAugeasFileWithPath, origFilePerms, origFileOwner, origFileGroup, augeasFileContents)
     else:
         resetTestFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup, puppetFileContents)
     results = None
     if method == 'uri':
-        results = qmf.run_uri(value, flag, schema, key)
+        results = module.run_uri(value, flag, schema, key)
     elif method == 'string':
-       results = qmf.run_string(value, flag, schema, key)
+       results = module.run_string(value, flag, schema, key)
     return results
 
 def checkFile(file, perms, owner, grp):
@@ -122,7 +125,7 @@ class HTTPThread(threading.Thread):
 # Initialization
 # =====================================================
 def setUpModule():
-    global httpd_thread, connection, qmf
+    global httpd_thread, connection, qmf, dbus
     httpd_thread = HTTPThread()
     httpd_thread.start()
 
@@ -135,6 +138,7 @@ def setUpModule():
 
     connection = SysconfigTestsSetup()
     qmf = connection.qmf
+    dbus = connection.dbus
 
 def tearDownModule():
     global connection
@@ -145,15 +149,23 @@ def tearDownModule():
 
 class SysconfigTestsSetup(testUtil.TestsSetup):
     def __init__(self):
-        testUtil.TestsSetup.__init__(self, "matahari-qmf-sysconfigd", "Sysconfig", "Sysconfig")
+        testUtil.TestsSetup.__init__(self, "matahari-qmf-sysconfigd", "Sysconfig", "Sysconfig",
+                                           "matahari-dbus-sysconfigd", ("org.matahariproject.Sysconfig",
+                                                                        "/org/matahariproject/Sysconfig",
+                                                                        "org.matahariproject.Sysconfig"))
 
 class TestSysconfigApi(unittest.TestCase):
 
     # TEST - getProperties()
     # =====================================================
     def test_hostname_property(self):
-        value = qmf.props.get('hostname')
-        self.assertTrue( value == cmd.getoutput("hostname"), "hostname not expected")
+        value = cmd.getoutput("hostname")
+        qmf_value = qmf.props.get('hostname')
+        self.assertEquals(value, qmf_value, "QMF: hostname not expected")
+
+        if testUtil.haveDBus:
+            dbus_value = dbus.get('hostname')
+            self.assertEquals(value, dbus_value, "DBus: hostname not expected")
 
     # TODO:
     #	no puppet
@@ -165,128 +177,234 @@ class TestSysconfigApi(unittest.TestCase):
     # ================================================================
     # TEST - Puppet
     def test_run_uri_good_url_puppet_manifest(self):
-        results = wrapper('uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'OK', "result: " + str(results.get('status')) + " != OK")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "file properties not expected")
+        results = wrapper(qmf, 'uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( results.get('status') == 'OK', "QMF result: " + str(results.get('status')) + " != OK")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue(str(results) == 'OK', "DBus result: " + str(results) + " != OK")
+            self.assertTrue(0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_http_url_not_found_puppet(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', testPuppetFileUrl+"_bad", 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', testPuppetFileUrl+"_bad", 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', testPuppetFileUrl+"_bad", 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_good_file_puppet_manifest(self):
-        results = wrapper('uri', 'file://'+testPuppetFileWithPath, 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'OK', "result: " + str(results.get('status')) + " != OK")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "file properties not expected")
+        results = wrapper(qmf, 'uri', 'file://'+testPuppetFileWithPath, 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( results.get('status') == 'OK', "QMF: result: " + str(results.get('status')) + " != OK")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'uri', 'file://'+testPuppetFileWithPath, 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue(str(results) == 'OK', "DBus: result: " + str(results) + " != OK")
+            self.assertTrue(0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_file_url_not_found(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', 'file://'+testPuppetFile, 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', 'file://'+testPuppetFile, 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', 'file://'+testPuppetFile, 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_bad_puppet_manifest(self):
         resetTestFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup, 'bad puppet script')
         results = qmf.run_uri(testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'FAILED\n1', "result: " + str(results.get('status')) + " != FAILED\n1")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertTrue( results.get('status') == 'FAILED\n1', "QMF: result: " + str(results.get('status')) + " != FAILED\n1")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            resetTestFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup, 'bad puppet script')
+            results = dbus.run_uri(testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue( str(results) == 'FAILED\n1', "DBus: result: " + str(results) + " != FAILED\n1")
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_non_schema(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', testPuppetFileUrl, 0, 'schema', testUtil.getRandomKey(5))
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', testPuppetFileUrl, 0, 'schema', testUtil.getRandomKey(5))
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', testPuppetFileUrl, 0, 'schema', testUtil.getRandomKey(5))
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     # TODO: need to handle upstream vs rhel difference
 
     # TEST - Augeas
     @attr('augeas')
     def test_run_uri_good_url_augeas(self):
-        results = wrapper('uri', testAugeasFileUrl, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
+        results = wrapper(qmf, 'uri', testAugeasFileUrl, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
-        self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
-        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
+        self.assertEqual(tokens[0], 'OK', "QMF: result: %s != OK" % tokens[0])
+        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "QMF: wrong format of result (%s)" % tokens[1])
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'uri', testAugeasFileUrl, 0, 'augeas', testUtil.getRandomKey(5))
+            tokens = results.split('\n')
+            self.assertEqual(tokens[0], 'OK', "DBus: result: %s != OK" % tokens[0])
+            self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "DBus: wrong format of result (%s)" % tokens[1])
 
     @attr('augeas')
     def test_run_uri_http_url_not_found_augeas(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', testAugeasFileUrl + "_bad", 0, 'augeas', testUtil.getRandomKey(5))
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', testAugeasFileUrl + "_bad", 0, 'augeas', testUtil.getRandomKey(5))
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', testAugeasFileUrl + "_bad", 0, 'augeas', testUtil.getRandomKey(5))
 
     @attr('augeas')
     def test_run_uri_good_file_augeas(self):
-        results = wrapper('uri', 'file://'+testAugeasFileWithPath, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
+        results = wrapper(qmf, 'uri', 'file://'+testAugeasFileWithPath, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
-        self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
-        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
+        self.assertEqual(tokens[0], 'OK', "QMF: result: %s != OK" % tokens[0])
+        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "QMF: wrong format of result (%s)" % tokens[1])
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'uri', 'file://'+testAugeasFileWithPath, 0, 'augeas', testUtil.getRandomKey(5))
+            tokens = results.split('\n')
+            self.assertEqual(tokens[0], 'OK', "DBus: result: %s != OK" % tokens[0])
+            self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "DBus: wrong format of result (%s)" % tokens[1])
 
     @attr('augeas')
     def test_run_uri_file_url_not_found(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', 'file://'+testAugeasFile, 0, 'augeas', testUtil.getRandomKey(5))
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', 'file://'+testAugeasFile, 0, 'augeas', testUtil.getRandomKey(5))
 
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', 'file://'+testAugeasFile, 0, 'augeas', testUtil.getRandomKey(5))
 
     def test_run_uri_empty_key(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', testPuppetFileUrl, 0, 'puppet', '')
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', testPuppetFileUrl, 0, 'puppet', '')
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', testPuppetFileUrl, 0, 'puppet', '')
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_uri_special_chars_in_key(self):
-        self.assertRaises(QmfAgentException, wrapper, 'uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5) + "'s $$$")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5) + "'s $$$")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'uri', testPuppetFileUrl, 0, 'puppet', testUtil.getRandomKey(5) + "'s $$$")
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     # TEST - run_string()
     # ================================================================
     # TEST - Puppet
     def test_run_string_good_puppet_manifest(self):
-        results = wrapper('string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'OK', "result: " + str(results.get('status')) + " != OK")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "file properties not expected")
+        results = wrapper(qmf, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( results.get('status') == 'OK', "QMF: result: " + str(results.get('status')) + " != OK")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue( results == 'OK', "DBus: result: " + str(results) + " != OK")
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, targetFilePerms, targetFileOwner, targetFileGroup), "DBus: file properties not expected")
 
     def test_run_string_bad_puppet_manifest(self):
-        results = wrapper('string', 'bad puppet manifest', 0, 'puppet', testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'FAILED\n1', "result: " + str(results.get('status')) + " != FAILED\n1")
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        results = wrapper(qmf, 'string', 'bad puppet manifest', 0, 'puppet', testUtil.getRandomKey(5))
+        self.assertTrue( results.get('status') == 'FAILED\n1', "QMF: result: " + str(results.get('status')) + " != FAILED\n1")
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'string', 'bad puppet manifest', 0, 'puppet', testUtil.getRandomKey(5))
+            self.assertTrue(str(results) == 'FAILED\n1', "DBus: result: " + str(results) + " != FAILED\n1")
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_string_non_schema(self):
-        self.assertRaises(QmfAgentException, wrapper, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'schema', testUtil.getRandomKey(5))
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'schema', testUtil.getRandomKey(5))
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'schema', testUtil.getRandomKey(5))
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     def test_run_string_empty_key(self):
-        self.assertRaises(QmfAgentException, wrapper, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', '')
-        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
+        self.assertRaises(QmfAgentException, wrapper, qmf, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', '')
+        self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "QMF: file properties not expected")
+
+        if testUtil.haveDBus:
+            self.assertRaises(DBusException, wrapper, dbus, 'string', testUtil.getFileContents(testPuppetFileWithPath), 0, 'puppet', '')
+            self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "DBus: file properties not expected")
 
     # TEST - Augeas
     @attr('augeas')
     def test_run_string_good_augeas(self):
-        results = wrapper('string', augeasFileContents, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
+        results = wrapper(qmf, 'string', augeasFileContents, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
-        self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
-        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
+        self.assertEqual(tokens[0], 'OK', "QMF: result: %s != OK" % tokens[0])
+        self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "QMF: wrong format of result (%s)" % tokens[1])
+
+        if testUtil.haveDBus:
+            results = wrapper(dbus, 'string', augeasFileContents, 0, 'augeas', testUtil.getRandomKey(5))
+            tokens = results.split('\n')
+            self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
+            self.assertTrue(tokens[1].startswith("%s = " % augeasQuery), "DBus: wrong format of result (%s)" % tokens[1])
 
     @attr('augeas')
     def test_run_string_bad_augeas(self):
-        result = wrapper('string', 'bad augeas query', 0, 'augeas', testUtil.getRandomKey(5)).get('status')
+        result = wrapper(qmf, 'string', 'bad augeas query', 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = result.split('\n')
-        self.assertEqual(tokens[0], 'FAILED', "result: %s != FAILED" % tokens[0])
+        self.assertEqual(tokens[0], 'FAILED', "QMF: result: %s != FAILED" % tokens[0])
+
+        if testUtil.haveDBus:
+            result = wrapper(dbus, 'string', 'bad augeas query', 0, 'augeas', testUtil.getRandomKey(5))
+            tokens = result.split('\n')
+            self.assertEqual(tokens[0], 'FAILED', "DBus: result: %s != FAILED" % tokens[0])
 
     # TEST - query()
     # ================================================================
     @attr('augeas')
     def test_query_good_augeas(self):
         result = qmf.query(augeasQuery, 0, 'augeas').get('data')
-        self.assertNotEqual(result, 'unknown', "result: %s == unknown" % result)
+        self.assertNotEqual(result, 'unknown', "QMF result: %s == unknown" % result)
+
+        if testUtil.haveDBus:
+            result = dbus.query(augeasQuery, 0, 'augeas')
+            self.assertNotEqual(result, 'unknown', "DBus result: %s == unknown" % result)
 
     @attr('augeas')
     def test_query_bad_augeas(self):
         result = qmf.query('bad augeas query', 0, 'augeas').get('data')
-        self.assertEqual(result, 'unknown', "result: %s != unknown" % result)
+        self.assertEqual(result, 'unknown', "QMF result: %s != unknown" % result)
+
+        if testUtil.haveDBus:
+            result = dbus.query('bad augeas query', 0, 'augeas')
+            self.assertEqual(result, 'unknown', "DBus result: %s != unknown" % result)
 
     # TEST - is_configured()
     # ================================================================
     def test_is_configured_known_key(self):
         key = testUtil.getRandomKey(5)
-        wrapper('uri',testPuppetFileUrl, 0, 'puppet', key)
+        wrapper(qmf, 'uri',testPuppetFileUrl, 0, 'puppet', key)
         results = qmf.is_configured(key)
-        self.assertTrue( results.get('status') == 'OK', "result: " + str(results.get('status')) + " != OK")
+        self.assertTrue( results.get('status') == 'OK', "QMF result: " + str(results.get('status')) + " != OK")
+
+        if testUtil.haveDBus:
+            key = testUtil.getRandomKey(5)
+            wrapper(dbus, 'uri',testPuppetFileUrl, 0, 'puppet', key)
+            results = dbus.is_configured(key)
+            self.assertTrue(str(results) == 'OK', "DBus result: " + str(results) + " != OK")
 
     def test_is_configured_unknown_key(self):
         results = qmf.is_configured(testUtil.getRandomKey(5))
-        self.assertTrue( results.get('status') == 'unknown', "result: " + str(results.get('status')) + " != unknown")
+        self.assertTrue( results.get('status') == 'unknown', "QMF result: " + str(results.get('status')) + " != unknown")
+
+        if testUtil.haveDBus:
+            results = dbus.is_configured(testUtil.getRandomKey(5))
+            self.assertTrue( str(results) == 'unknown', "DBus result: " + str(results) + " != unknown")
 
     def test_is_configured_failed_key(self):
         key = testUtil.getRandomKey(5)
-        wrapper('string', "bad puppet manifest", 0, 'puppet', key)
+        wrapper(qmf, 'string', "bad puppet manifest", 0, 'puppet', key)
         tokens = qmf.is_configured(key).get('status').split('\n')
-        self.assertTrue(tokens[0] == 'FAILED', "result: %s != FAILED" % tokens[0])
+        self.assertTrue(tokens[0] == 'FAILED', "QMF result: %s != FAILED" % tokens[0])
+
+        if testUtil.haveDBus:
+            key = testUtil.getRandomKey(5)
+            wrapper(dbus, 'string', "bad puppet manifest", 0, 'puppet', key)
+            tokens = dbus.is_configured(key).split('\n')
+            self.assertTrue(tokens[0] == 'FAILED', "DBus result: %s != FAILED" % tokens[0])
