@@ -25,6 +25,10 @@
 #ifndef __MH_HOST_H__
 #define __MH_HOST_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <sigar.h>
@@ -152,5 +156,9 @@ mh_host_get_power_profile(char **profile);
  */
 GList *
 mh_host_list_power_profiles(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __MH_HOST_H__

@@ -29,13 +29,11 @@
 #include <qmf/Data.h>
 #include "qmf/org/matahariproject/QmfPackage.h"
 
-extern "C" {
 #include <string.h>
 #include <sigar.h>
 #include "matahari/host.h"
 #include "matahari/logging.h"
 #include "matahari/errors.h"
-}
 
 class HostAgent : public MatahariAgent
 {

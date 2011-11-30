@@ -18,10 +18,8 @@
 
 #include "config.h"
 
-extern "C" {
 #include <stdlib.h>
 #include <string.h>
-};
 
 #include <string>
 #include <qpid/management/Manageable.h>
@@ -30,11 +28,9 @@ extern "C" {
 
 #include "qmf/org/matahariproject/QmfPackage.h"
 
-extern "C" {
 #include "matahari/logging.h"
 #include "matahari/services.h"
 #include "matahari/errors.h"
-}
 
 #include <iostream>
 

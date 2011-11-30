@@ -25,6 +25,10 @@
 #ifndef __MH_SERVICES__
 #define __MH_SERVICES__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <glib.h>
 #include <stdio.h>
 #include "matahari/mainloop.h"
@@ -268,5 +272,9 @@ services_get_ocf_exitcode(char *action, int lsb_exitcode)
      * for rc <= 7 */
     return (enum ocf_exitcode)lsb_exitcode;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __MH_SERVICES__ */

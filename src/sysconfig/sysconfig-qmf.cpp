@@ -27,11 +27,9 @@
 #include "qmf/org/matahariproject/QmfPackage.h"
 #include "matahari/agent.h"
 
-extern "C" {
 #include "matahari/logging.h"
 #include "matahari/host.h"
 #include "matahari/sysconfig.h"
-};
 
 class ConfigAgent : public MatahariAgent
 {

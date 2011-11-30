@@ -42,19 +42,20 @@
 #include <qmf/SchemaProperty.h>
 #include "matahari/agent.h"
 
-extern "C" {
 #include <sys/types.h>
 #include "matahari/logging.h"
 #include "matahari/dnssrv.h"
 #include "matahari/utilities.h"
+
 #ifndef WIN32
+extern "C" {
 #include <sys/socket.h>
 #include <netdb.h>
 #ifdef MH_SSL
 #include <secmod.h>
 #endif
-#endif
 }
+#endif
 
 using namespace qpid::management;
 using namespace qpid::client;

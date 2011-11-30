@@ -32,9 +32,7 @@
 #include <iostream>
 #include <sstream>
 
-extern "C" {
 #include "matahari/logging.h"
-}
 
 using namespace std;
 using namespace qmf;

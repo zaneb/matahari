@@ -26,6 +26,10 @@
 #ifndef __MH_LOGGING__
 #define __MH_LOGGING__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef __linux__
 #  include <syslog.h>
 #else
@@ -198,4 +202,9 @@ extern struct _mh_ddebug __stop___verbose[];
         fprintf(stderr, fmt ": %s (%d)\n", ##args, err, errno);           \
         mh_log(level, fmt ": %s (%d)", ##args, err, errno);               \
     } while(0)
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

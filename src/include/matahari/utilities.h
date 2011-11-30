@@ -25,6 +25,10 @@
 #ifndef __MH_UTILITIES__
 #define __MH_UTILITIES__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "matahari/config.h"
 
 #include <stdlib.h>
@@ -140,4 +144,9 @@ mh_string_copy(char *dst, const char *src, size_t dst_len);
  */
 gsize
 mh_read_from_fd(int fd, char **data);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif

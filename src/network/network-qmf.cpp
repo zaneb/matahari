@@ -24,7 +24,6 @@
 
 #include <qpid/agent/ManagementAgent.h>
 
-extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <glib.h>
@@ -33,7 +32,6 @@ extern "C" {
 #include "matahari/network.h"
 #include "matahari/host.h"
 #include "matahari/errors.h"
-};
 
 class NetAgent : public MatahariAgent
 {
