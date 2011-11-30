@@ -526,17 +526,17 @@ host_os_list_power_profiles(void)
     char *args[3] = {0};
     GList *list = NULL;
     enum mh_result res;
-    int len;
+    size_t len;
 
     args[0] = TUNEDADM;
     args[1] = TA_LISTPROFILES;
     args[2] = NULL;
 
     res = exec_command(NULL, args, TIMEOUT, &stdoutbuf, NULL);
-    len = strlen(stdoutbuf);
 
     if (res == MH_RES_SUCCESS && stdoutbuf) {
         c1 = stdoutbuf;
+        len = strlen(stdoutbuf);
         do {
             // Each line with profile in "tuned-adm list" starts with "-"
             if (*c1 == '-' && c1 - stdoutbuf + 2 < len) {
