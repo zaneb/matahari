@@ -561,8 +561,6 @@ mh_read_from_fd(int fd, char **data)
 
     if (g_io_channel_read_to_end(ch, data, &length, &err) != G_IO_STATUS_NORMAL) {
         mh_err("Unable to read from filedescriptor %d: %s", fd, err->message);
-        free(*data);
-        data = NULL;
         return -err->code;
     }
     g_io_channel_close(ch);
