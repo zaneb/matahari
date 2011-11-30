@@ -206,6 +206,7 @@ install(FILES cmake/modules/MatahariMacros.cmake DESTINATION share/cmake/Modules
 if(WITH-QMF)
     install(FILES cmake/modules/FindQPID.cmake DESTINATION share/cmake/Modules)
     install(FILES include/matahari/agent.h DESTINATION include/matahari)
+    install(FILES include/matahari/object.h DESTINATION include/matahari)
     install(FILES include/matahari/mainloop.h DESTINATION include/matahari)
 endif(WITH-QMF)
 
