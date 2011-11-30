@@ -67,6 +67,7 @@ Sysconfig_run_uri(Matahari* matahari, const char *uri, uint flags,
 {
     GError* error = NULL;
     enum mh_result res;
+    struct AsyncCBData *asynccb;
 
     if (!check_authorization(SYSCONFIG_BUS_NAME ".run_uri", &error, context)) {
         dbus_g_method_return_error(context, error);
@@ -74,7 +75,9 @@ Sysconfig_run_uri(Matahari* matahari, const char *uri, uint flags,
         return FALSE;
     }
 
-    struct AsyncCBData *asynccb = malloc(sizeof(struct AsyncCBData));
+    if (!(asynccb = malloc(sizeof(*asynccb)))) {
+        return FALSE;
+    }
     asynccb->context = context;
     asynccb->key = strdup(key);
 
@@ -98,6 +101,7 @@ Sysconfig_run_string(Matahari* matahari, const char *text, uint flags,
 {
     GError* error = NULL;
     enum mh_result res;
+    struct AsyncCBData *asynccb;
 
     if (!check_authorization(SYSCONFIG_BUS_NAME ".run_string", &error,
             context)) {
@@ -106,7 +110,9 @@ Sysconfig_run_string(Matahari* matahari, const char *text, uint flags,
         return FALSE;
     }
 
-    struct AsyncCBData *asynccb = malloc(sizeof(struct AsyncCBData));
+    if (!(asynccb = malloc(sizeof(*asynccb)))) {
+        return FALSE;
+    }
     asynccb->context = context;
     asynccb->key = strdup(key);
 
