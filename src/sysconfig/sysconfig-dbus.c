@@ -116,7 +116,7 @@ Sysconfig_run_string(Matahari* matahari, const char *text, uint flags,
     asynccb->context = context;
     asynccb->key = strdup(key);
 
-    res = mh_sysconfig_run_string(text, flags, scheme, key, result_cb, NULL);
+    res = mh_sysconfig_run_string(text, flags, scheme, key, result_cb, asynccb);
     if (res != MH_RES_SUCCESS) {
         error = g_error_new(MATAHARI_ERROR, res, mh_result_to_str(res));
         dbus_g_method_return_error(context, error);
