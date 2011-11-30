@@ -142,7 +142,7 @@ mh_string_copy(char *dst, const char *src, size_t dst_len);
  * \retval >0 Number of characters read
  * \retval <0 Error occured
  */
-gsize
+gssize
 mh_read_from_fd(int fd, char **data);
 
 #ifdef __cplusplus
