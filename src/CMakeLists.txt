@@ -99,6 +99,11 @@ if(SIGAR-NOTFOUND)
     message(FATAL_ERROR "SIGAR library not found.")
 endif(SIGAR-NOTFOUND)
 
+pkg_check_modules(libxml2 libxml-2.0)
+if(NOT libxml2_FOUND)
+    message(FATAL_ERROR "libxml2 library not found.")
+endif(NOT libxml2_FOUND)
+
 # GLib
 pkg_check_modules(glib REQUIRED glib-2.0)
 if(NOT glib_FOUND)
@@ -194,6 +199,7 @@ add_subdirectory(network)
 add_subdirectory(rpc)
 add_subdirectory(service)
 add_subdirectory(sysconfig)
+add_subdirectory(dbus-bridge)
 add_subdirectory(unittests)
 
 ### Installation
