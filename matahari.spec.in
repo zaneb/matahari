@@ -244,14 +244,14 @@ QMF console for monitoring various agents
 
 %build
 %{cmake} -DCMAKE_BUILD_TYPE=RelWithDebInfo %{!?with_qmf: -DWITH-QMF:BOOL=OFF} %{!?with_dbus: -DWITH-DBUS:BOOL=OFF} -Dinitdir=%{_initddir} -Dsysconfdir=%{_sysconfdir} .
-make %{?_smp_mflags}
+make -f Makefile %{?_smp_mflags}
 %if %{defined run_unit_tests}
 cd src/tests && ctest -V
 %endif
 
 %install
 rm -rf %{buildroot}
-make DESTDIR=%{buildroot} install
+make DESTDIR=%{buildroot} -f Makefile install
 
 %if %{systemd}
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-service
