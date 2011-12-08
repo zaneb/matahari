@@ -68,6 +68,16 @@ int
 mh_rpc_load_plugins(size_t *count, mh_rpc_plugin_t **plugins);
 
 /**
+ * Get a list of procedures supplied by the plugin.
+ * \param plugin pointer to the plugin.
+ * \return pointer to an array of strings containing the method names. The last
+ * value in the array is NULL. Both the array and the strings it contains
+ * should be released with a call to free().
+ */
+char **
+mh_rpc_get_procedures(const mh_rpc_plugin_t *plugin);
+
+/**
  * Create a Remote Method Invocation.
  * This should be freed with mh_rpc_rmi_destroy() when done.
  * \param pcall pointer in which to store the RMI data.

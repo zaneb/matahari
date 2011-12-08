@@ -199,6 +199,78 @@ cleanup:
 }
 
 /**
+ * Convert the supplied Python string to a newly-allocated C string. This
+ * string must later be released with a call to free().
+ *
+ * This function consumes a reference to the input Python string.
+ *
+ * \param object the Python string object.
+ * \return pointer to a new C string containing the Python object's string.
+ */
+static char *
+py_to_c_string(PyObject *object)
+{
+    char *str;
+
+    if (!object) {
+        return NULL;
+    }
+
+    str = PyString_AsString(object);
+    if (!str) {
+        mh_err("Error getting string");
+        PyErr_Print();
+        Py_DECREF(object);
+        return NULL;
+    }
+    str = strdup(str);
+
+    Py_DECREF(object);
+    return str;
+}
+
+char **get_procedures(const struct mh_rpc_plugin_impl *plugin)
+{
+    PyObject *proclist;
+    Py_ssize_t len;
+    size_t i;
+    char **procs = NULL;
+
+    proclist = PyObject_CallMethod(plugin->plugin, "procedures", NULL);
+    if (!proclist) {
+        mh_err("Failed to get procedure list");
+        PyErr_Print();
+        return NULL;
+    }
+
+    len = PySequence_Length(proclist);
+    if (len < 0) {
+        mh_err("Failed to get length of procedure list");
+        Py_DECREF(proclist);
+        return NULL;
+    }
+
+    procs = malloc(sizeof(char*) * (len + 1));
+    if (!procs) {
+        mh_err("Out of memory");
+        return NULL;
+    }
+
+    for (i = 0; i < len; i++) {
+        procs[i] = py_to_c_string(PySequence_GetItem(proclist, i));
+        if (!procs[i]) {
+            break;
+        }
+        mh_debug("Found procedure \"%s\"", procs[i]);
+    }
+    procs[len] = NULL;
+
+    Py_DECREF(proclist);
+
+    return procs;
+}
+
+/**
  * Return a Python string for an argument value.
  *
  * This function creates a new reference to the returned object.
@@ -252,37 +324,6 @@ get_arg_list(const struct rpc_arg_list *args,
     }
 
     return arglist;
-}
-
-/**
- * Convert the supplied Python string to a newly-allocated C string. This
- * string must later be released with a call to free().
- *
- * This function consumes a reference to the input Python string.
- *
- * \param object the Python string object.
- * \return pointer to a new C string containing the Python object's string.
- */
-static char *
-py_to_c_string(PyObject *object)
-{
-    char *str;
-
-    if (!object) {
-        return NULL;
-    }
-
-    str = PyString_AsString(object);
-    if (!str) {
-        mh_err("Error getting string");
-        PyErr_Print();
-        Py_DECREF(object);
-        return NULL;
-    }
-    str = strdup(str);
-
-    Py_DECREF(object);
-    return str;
 }
 
 /**
@@ -383,5 +424,6 @@ struct mh_rpc_api mh_rpc_python_api = {
     init,
     deinit,
     load_plugins,
+    get_procedures,
     invoke,
 };

@@ -10,7 +10,9 @@ class Plugin(object):
         self.name = self.module.__name__
 
     def procedures(self):
-        return [p.__name__ for p in self.module if callable(p)]
+        isProcedure = lambda a: callable(getattr(self.module, a))
+        return [o for o in dir(self.module) if isProcedure(o) and
+                                               not o.startswith('_')]
 
     def call(self, procedure, args_json=[], kwargs_json=[]):
         func = getattr(self.module, procedure)

@@ -81,6 +81,16 @@ mh_rpc_load_plugins(size_t *count, mh_rpc_plugin_t **plugins)
     return 0;
 }
 
+char **
+mh_rpc_get_procedures(const mh_rpc_plugin_t *plugin)
+{
+    if (!api_defined(plugin->type)) {
+        return NULL;
+    }
+
+    return apis[plugin->type]->get_procedures(plugin->impl);
+}
+
 int
 mh_rpc_call_create(mh_rpc_t *pcall,
                    const char *procedure)

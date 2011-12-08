@@ -10,3 +10,6 @@ def testException():
 
 def showArgs(*args, **kwargs):
     return {'args': args, 'kwargs': kwargs}
+
+def _hidden():
+    raise Exception('This method should not be visible')

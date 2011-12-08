@@ -30,6 +30,7 @@ struct mh_rpc_api {
     void (*init)(int, char**);
     void (*deinit)(void);
     int (*load_plugins)(size_t*, mh_rpc_plugin_t**);
+    char **(*get_procedures)(const struct mh_rpc_plugin_impl*);
     enum mh_result (*invoke)(const struct mh_rpc_plugin_impl*,
                              const struct mh_rpc*,
                              mh_rpc_result_t *output);

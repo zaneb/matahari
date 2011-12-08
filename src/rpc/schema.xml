@@ -2,6 +2,7 @@
 
     <class name="Plugin">
         <property name="name" type="sstr" access="RO" />
+        <property name="commands" type="list" access="RO" />
 
         <method name="invoke" desc="Make a remote procedure call">
             <arg name="procedure" dir="I" type="sstr" />

@@ -45,9 +45,12 @@ public:
     bool invoke(qmf::AgentSession& session, qmf::AgentEvent& event);
 
 private:
+    typedef std::set<std::string> CommandList;
+
     RPCAgent& _agent;
     std::string _name;
     mh_rpc_plugin_t _plugin;
+    CommandList _commands;
 };
 
 
@@ -139,7 +142,20 @@ RPCPlugin::RPCPlugin(RPCAgent& agent, mh_rpc_plugin_t& plugin):
 {
     mh_info("Creating Plugin %s", _name.c_str());
 
+    char **procs = mh_rpc_get_procedures(&_plugin);
+    qpid::types::Variant::List cmd_list;
+    if (procs) {
+        for (char **p = procs; *p; p++) {
+            _commands.insert(*p);
+            cmd_list.push_back(qpid::types::Variant(*p));
+            free(*p);
+        }
+        free(procs);
+    }
+
     _instance.setProperty("name", _name);
+    _instance.setProperty("commands", cmd_list);
+
     *_agent._objectManager += this;
 }
 
@@ -160,8 +176,13 @@ RPCPlugin::invoke(qmf::AgentSession& session, qmf::AgentEvent& event)
 
     if (methodName == "invoke") {
         mh_rpc_t call;
-        mh_rpc_call_create(&call,
-                      args["procedure"].asString().c_str());
+        std::string proc(args["procedure"].asString());
+
+        if (_commands.find(proc) == _commands.end()) {
+            session.raiseException(event, mh_result_to_str(MH_RES_INVALID_ARGS));
+        }
+
+        mh_rpc_call_create(&call, proc.c_str());
 
         qpid::types::Variant::List arglist(args["args"].asList());
         for (qpid::types::Variant::List::iterator iter = arglist.begin();
