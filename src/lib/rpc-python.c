@@ -25,6 +25,9 @@
 #include "matahari/errors.h"
 
 
+#define RPC_SERVER_MODULE "matahari.rpc_server"
+
+
 struct mh_rpc_plugin_impl {
     PyObject *plugin;
 };
@@ -62,7 +65,7 @@ call_rpc_server_func(const char *funcname, PyObject *args)
 {
     PyObject *rpc_mod, *func, *result;
 
-    rpc_mod = PyImport_ImportModule("rpc"); // TODO: move to matahari package
+    rpc_mod = PyImport_ImportModule(RPC_SERVER_MODULE);
     if (!rpc_mod) {
         mh_err("Error importing Matahari RPC Python module");
         PyErr_Print();
