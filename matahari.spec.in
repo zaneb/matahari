@@ -43,6 +43,7 @@ Requires:       %{name}-consoles = %{version}-%{release}
 Requires:       %{name}-broker = %{version}-%{release}
 Requires:       %{name}-host = %{version}-%{release}
 Requires:       %{name}-network = %{version}-%{release}
+Requires:       %{name}-rpc = %{version}-%{release}
 Requires:       %{name}-service = %{version}-%{release}
 Requires:       %{name}-sysconfig = %{version}-%{release}
 
@@ -188,6 +189,19 @@ Obsoletes:      matahari-net < %{version}-%{release}
 %description network
 QMF agent for viewing and controlling network devices
 
+%package rpc
+License:        GPLv2+
+Summary:        QMF agent for RPC plugins
+Group:          Applications/System
+Requires:       %{name}-lib = %{version}-%{release}
+Requires:       %{name}-agent-lib = %{version}-%{release}
+Requires(post): chkconfig
+Requires(preun):chkconfig
+Requires(preun):initscripts
+
+%description rpc
+QMF agent for dispatching RPC calls to plugins
+
 %package service
 License:        GPLv2+
 Summary:        QMF agent for system services
@@ -257,6 +271,7 @@ make DESTDIR=%{buildroot} -f Makefile install
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-service
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-network
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-host
+rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-rpc
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-sysconfig
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-sysconfig-console
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-broker
@@ -317,6 +332,29 @@ fi
 %postun network
 if [ "$1" -ge "1" ]; then
     /sbin/service matahari-network condrestart >/dev/null 2>&1 || :
+fi
+
+#== RPC
+
+%post rpc
+%if %{systemd}
+systemctl --system daemon-reload
+%else
+/sbin/chkconfig --add matahari-rpc
+%endif
+/sbin/service matahari-rpc condrestart
+
+%preun rpc
+if [ $1 = 0 ]; then
+   /sbin/service matahari-rpc stop >/dev/null 2>&1 || :
+%if !%{systemd}
+   chkconfig --del matahari-rpc
+%endif
+fi
+
+%postun rpc
+if [ "$1" -ge "1" ]; then
+    /sbin/service matahari-rpc condrestart >/dev/null 2>&1 || :
 fi
 
 #== Services
@@ -460,6 +498,7 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{_libdir}/libmcommon.so.*
 %{_libdir}/libmhost.so.*
 %{_libdir}/libmnetwork.so.*
+%{_libdir}/libmrpc.so.*
 %{_libdir}/libmservice.so.*
 %{_libdir}/libmsysconfig.so.*
 %doc AUTHORS COPYING
@@ -518,6 +557,22 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{_datadir}/polkit-1/actions/org.matahariproject.Host.policy
 %{_datadir}/dbus-1/interfaces/org.matahariproject.Host.xml
 %{_datadir}/dbus-1/system-services/org.matahariproject.Host.service
+%endif
+
+%files rpc
+%defattr(644, root, root, 755)
+%doc AUTHORS COPYING
+
+%if %{systemd}
+%{_unitdir}/matahari-rpc.service
+%endif
+
+%if %{with qmf}
+%if !%{systemd}
+%attr(755, root, root) %{_initddir}/matahari-rpc
+%endif
+%attr(755, root, root) %{_sbindir}/matahari-qmf-rpcd
+%{_mandir}/man8/matahari-qmf-rpcd.8*
 %endif
 
 %files service
@@ -651,6 +706,7 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{_includedir}/matahari/dnssrv.h
 %{_includedir}/matahari/host.h
 %{_includedir}/matahari/network.h
+%{_includedir}/matahari/rpc.h
 %{_includedir}/matahari/sysconfig.h
 %{_includedir}/matahari/services.h
 %{_datadir}/cmake/Modules/FindMatahari.cmake

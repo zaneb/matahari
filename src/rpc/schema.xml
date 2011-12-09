@@ -1,0 +1,19 @@
+<schema package="org.matahariproject.rpc">
+
+    <class name="Plugin">
+        <property name="name" type="sstr" access="RO" />
+
+        <method name="invoke" desc="Make a remote procedure call">
+            <arg name="procedure" dir="I" type="sstr" />
+            <arg name="args"      dir="I" type="list" />
+            <arg name="kwargs"    dir="I" type="map" />
+            <arg name="result"    dir="O" type="lstr" />
+        </method>
+    </class>
+
+    <class name="PluginException">
+        <property name="type" type="sstr" />
+        <property name="value" type="lstr" />
+        <property name="traceback" type="lstr" />
+    </class>
+</schema>
