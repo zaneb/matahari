@@ -108,7 +108,7 @@ class Manager(object):
     def hosts(self):
         """Get a set of hosts which have active Matahari agents"""
         return frozenset(a.host() for a in self._agents())
-        
+
     def agents(self, hosts=None):
         """Get a set of active Matahari agents. Optionally filter by host."""
         filters = {}

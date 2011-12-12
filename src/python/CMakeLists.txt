@@ -23,8 +23,16 @@ if(WITH-QMF)
                     OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-    py_module(__init__ matahari)
-    py_module(rpc_server matahari)
+    py_module(__init__     matahari)
+    py_module(rpc_server   matahari)
+    py_module(core         matahari)
+    py_module(__init__     matahari/interpreter)
+    py_module(interpreter  matahari/interpreter)
+    py_module(mode         matahari/interpreter)
+    py_module(command      matahari/interpreter)
+
+    install(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/mhsh
+            DESTINATION bin)
 
 endif(WITH-QMF)
 
