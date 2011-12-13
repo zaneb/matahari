@@ -16,5 +16,6 @@ if(WITH-QMF)
 
     install(TARGETS ${QMF_AGENT} DESTINATION sbin)
 
+    install(CODE "file(MAKE_DIRECTORY \$ENV{DESTDIR}/usr/lib/matahari/plugins)")
 endif(WITH-QMF)
 

@@ -581,6 +581,7 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %files rpc
 %defattr(644, root, root, 755)
 %doc AUTHORS COPYING
+%attr(0755, -, -) %dir /usr/lib/matahari/plugins
 
 %if %{systemd}
 %{_unitdir}/matahari-rpc.service

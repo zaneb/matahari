@@ -2,7 +2,7 @@ import sys, os
 import json
 import traceback
 
-(PLUGIN_PATH,) = ('.',) # TODO: choose proper install path
+(PLUGIN_PATH,) = ('/usr/lib/matahari/plugins',)
 
 class Plugin(object):
     def __init__(self, module):
@@ -28,7 +28,10 @@ def plugins(path=PLUGIN_PATH):
     old_path = sys.path
     try:
         sys.path = [path] + old_path
-        filenames = [os.path.splitext(f) for f in os.listdir(path)]
+        try:
+            filenames = [os.path.splitext(f) for f in os.listdir(path)]
+        except OSError:
+            return []
         modnames = [n for n, e in filenames if e == '.py']
         def getPlugin(name):
             try:
