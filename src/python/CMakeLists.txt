@@ -6,7 +6,6 @@ macro(py_module MODULE DIRECTORY)
          DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY})
 
     # Compile .pyc and .pyo files
-    execute_process(COMMAND echo "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
     execute_process(COMMAND ${PYTHON_EXECUTABLE} -m py_compile ${MODULE}.py
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY})
     execute_process(COMMAND ${PYTHON_EXECUTABLE} -O -m py_compile ${MODULE}.py
@@ -26,6 +25,8 @@ if(WITH-QMF)
     py_module(__init__     matahari)
     py_module(rpc_server   matahari)
     py_module(core         matahari)
+    py_module(shell        matahari)
+    py_module(shellmode    matahari)
     py_module(__init__     matahari/interpreter)
     py_module(interpreter  matahari/interpreter)
     py_module(mode         matahari/interpreter)
