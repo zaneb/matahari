@@ -4,6 +4,7 @@ import qmf.console as qc
 
 
 (TIMEOUT,) = (10,)
+exclude_packages = frozenset(['org.apache.qpid.broker'])
 
 
 _chain = itertools.chain.from_iterable
@@ -37,6 +38,7 @@ class MHAgent(object):
         """Get the host on which the agent in running"""
         return self._host
 
+
 class Host(object):
     """A Host on which Matahari agents are running"""
     def __init__(self, agentobj):
@@ -63,10 +65,13 @@ class Host(object):
         """Return the host (filesystem) UUID"""
         return self._uuid
 
+
 class AsyncHandler(qc.Console):
     """A handler for Asynchronous QMF events"""
     def __init__(self):
         self.method_response_handler = None
+        self.packages = []
+        self.classes = []
 
     def handle_method_responses(self, callback):
         """Register a callback for QMF method responses"""
@@ -76,13 +81,24 @@ class AsyncHandler(qc.Console):
         if self.method_response_handler:
             self.method_response_handler(seq, response)
 
+    def newClass(self, kind, classKey):
+        if (kind == qc.SchemaClass.CLASS_KIND_TABLE and
+            classKey.getPackageName() not in exclude_packages):
+            self.classes.append(classKey)
+
+    def newPackage(self, name):
+        if name not in exclude_packages:
+            self.packages.append(name)
+
+
 class Manager(object):
-    def __init__(self, broker='localhost', port=49000, ssl=False):
+    def __init__(self, broker='localhost', port=49000, ssl=False,
+                 async_handler=AsyncHandler()):
         addr = '%(prot)s://%(host)s:%(port)u' % {'host': broker,
                                                  'port': port,
                                                  'prot': ssl and 'amqps'
                                                               or 'amqp'}
-        self._async = AsyncHandler()
+        self._async = async_handler
         self._session = qc.Session(self._async)
         self._broker = self._session.addBroker(addr)
 
