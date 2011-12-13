@@ -14,10 +14,11 @@ from command import InvalidCommandException, InvalidArgumentException
 class Interpreter(cmd.Cmd):
     """A modal command interpreter."""
 
-    def __init__(self, prompt, mode=mode.Mode()):
+    def __init__(self, prompt, mode=mode.Mode(), debug=False):
         """Initialise the interpreter in the initial mode."""
         cmd.Cmd.__init__(self)
         self.name = prompt
+        self.debug = debug
         self.mode = None
         self.set_mode(mode)
         self.doc_header = 'Commands:'
@@ -64,6 +65,10 @@ class Interpreter(cmd.Cmd):
         except Exception, e:
             data = '\n'.join('% ' + l for l in str(e).splitlines())
             self.stdout.write(data + '\n\n')
+
+            if self.debug:
+                import traceback
+                self.stdout.write(traceback.format_exc())
 
     def cmdloop(self, *args, **kwargs):
         while True:
