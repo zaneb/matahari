@@ -30,7 +30,8 @@ class Interpreter(cmd.Cmd):
             self.mode.deactivate(self)
         self.mode = mode
         self.mode.activate(self)
-        self.prompt = self.name + mode.prompt() + '> '
+        custom_prompt = mode.prompt()
+        self.prompt = self.name + (custom_prompt and ' ') + custom_prompt + '> '
 
     def completenames(self, *args):
         # Tab-complete should move to the next argument
