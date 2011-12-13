@@ -3,7 +3,7 @@ Matahari Shell modes.
 """
 
 from interpreter import *
-from core import Manager
+import shelltypes
 
 
 class RootMode(Mode):
@@ -12,6 +12,10 @@ class RootMode(Mode):
     def __init__(self, manager):
         Mode.__init__(self)
         self.manager = manager
+
+        select_wrapper = Command('select', 'host',
+                                 [shelltypes.Host(self.manager)])
+        self += select_wrapper(self.select)
 
     def getFilteredMode(self, hosts):
         return FilteredMode(self.manager, hosts)
@@ -24,11 +28,9 @@ class RootMode(Mode):
         """Show the list of connected hosts."""
         self.write(*[str(h) for h in self.manager.hosts()])
 
-    @Command('select', 'host', ['HOST'])
-    def select(self, kw_host, *arg_hosts):
+    def select(self, kw_select, kw_host, *arg_hosts):
         """ Select a set of hosts to restrict commands to."""
-        hosts = [h for h in self.manager.hosts() if str(h) in arg_hosts]
-        self.shell.set_mode(self.getFilteredMode(hosts))
+        self.shell.set_mode(self.getFilteredMode(arg_hosts))
 
     @Command('class', ('package', 'PACKAGE'), 'CLASS')
     def package_class(self, kw_class, (kw_package, package), klass):
