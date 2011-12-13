@@ -25,6 +25,10 @@
 #ifndef __MH_UTILITIES__
 #define __MH_UTILITIES__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "matahari/config.h"
 
 #include <stdlib.h>
@@ -127,5 +131,22 @@ mh_strlen_zero(const char *s)
  */
 char *
 mh_string_copy(char *dst, const char *src, size_t dst_len);
+
+/**
+ * Read the whole content of file from file descriptor
+ *
+ * \param[in] fd File descriptor to read from. Must be readable.
+ * \param[out] data Data read from the file. Must be freed with free().
+ *
+ * \retval 0 File is empty
+ * \retval >0 Number of characters read
+ * \retval <0 Error occured
+ */
+gssize
+mh_read_from_fd(int fd, char **data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

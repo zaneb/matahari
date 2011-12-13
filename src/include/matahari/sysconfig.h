@@ -26,6 +26,10 @@
 #ifndef __MH_SYSCONFIG_H__
 #define __MH_SYSCONFIG_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <glib.h>
 
@@ -118,5 +122,9 @@ mh_sysconfig_set_configured(const char *key, const char *contents);
  */
 char *
 mh_sysconfig_is_configured(const char *key);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __MH_SYSCONFIG_H__

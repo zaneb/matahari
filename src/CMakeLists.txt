@@ -108,6 +108,10 @@ include_directories(${glib_INCLUDE_DIRS})
 SET(CMAKE_REQUIRED_LIBRARIES ${glib_LIBRARIES})
 check_function_exists (g_list_free_full HAVE_G_LIST_FREE_FULL)
 
+# Python
+pkg_check_modules(python REQUIRED python)
+include_directories(${python_INCLUDE_DIRS})
+
 # cURL
 if(NOT WIN32)
     find_library(CURL curl)
@@ -181,9 +185,11 @@ endif(WITH-QMF)
 
 ### Subdirectories
 add_subdirectory(broker)
+add_subdirectory(python)
 add_subdirectory(lib)
 add_subdirectory(host)
 add_subdirectory(network)
+add_subdirectory(rpc)
 add_subdirectory(service)
 add_subdirectory(sysconfig)
 add_subdirectory(unittests)
@@ -198,6 +204,7 @@ install(FILES include/matahari/errors.h DESTINATION include/matahari)
 install(FILES include/matahari/dnssrv.h DESTINATION include/matahari)
 install(FILES include/matahari/host.h DESTINATION include/matahari)
 install(FILES include/matahari/network.h DESTINATION include/matahari)
+install(FILES include/matahari/rpc.h DESTINATION include/matahari)
 install(FILES include/matahari/sysconfig.h DESTINATION include/matahari)
 install(FILES include/matahari/services.h DESTINATION include/matahari)
 install(FILES cmake/modules/FindMatahari.cmake DESTINATION share/cmake/Modules)
@@ -206,6 +213,7 @@ install(FILES cmake/modules/MatahariMacros.cmake DESTINATION share/cmake/Modules
 if(WITH-QMF)
     install(FILES cmake/modules/FindQPID.cmake DESTINATION share/cmake/Modules)
     install(FILES include/matahari/agent.h DESTINATION include/matahari)
+    install(FILES include/matahari/object.h DESTINATION include/matahari)
     install(FILES include/matahari/mainloop.h DESTINATION include/matahari)
 endif(WITH-QMF)
 

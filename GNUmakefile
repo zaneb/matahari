@@ -56,6 +56,9 @@ tests: linux.build
 		cd linux.build/src/unittests && ctest -V; \
 	fi
 
+install: linux.build
+	$(MAKE) --no-print-dir -C $< install
+
 windows.build:
 	@echo "=::=::=::= Setting up for Windows =::=::=::= "
 	mkdir -p $@
@@ -187,4 +190,4 @@ endif
 	@sed -i -e 's/###MATAHARI_VERSION###/$(VERSION)/' doc/Doxyfile
 	@doxygen doc/Doxyfile
 
-.PHONY: check linux.build windows.build clean doxygen tags www-doxygen coverity $(VARIANT)$(PACKAGE).spec
+.PHONY: check linux.build windows.build install clean doxygen tags www-doxygen coverity $(VARIANT)$(PACKAGE).spec

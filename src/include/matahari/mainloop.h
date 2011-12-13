@@ -25,6 +25,10 @@
 #ifndef __MH_MAINLOOP__
 #define __MH_MAINLOOP__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <glib.h>
 #include <sys/types.h>
 
@@ -100,5 +104,9 @@ void
 mainloop_add_child(pid_t pid, int timeout, const char *desc, void *privatedata,
                    void (*callback)(mainloop_child_t* p, int status, int signo,
                                     int exitcode));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

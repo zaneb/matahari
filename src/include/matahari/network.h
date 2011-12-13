@@ -25,6 +25,10 @@
 #ifndef __NETWORK_H
 #define __NETWORK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <glib.h>
 #include <stdint.h>
 
@@ -138,5 +142,9 @@ mh_network_restart(const char *iface);
  */
 int
 mh_network_status(const char *iface, uint64_t *flags);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NETWORK_H */

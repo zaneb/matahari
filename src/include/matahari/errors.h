@@ -26,6 +26,10 @@
 #ifndef __MH_ERRORS_H__
 #define __MH_ERRORS_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Global enumeration with result codes.
  */
@@ -48,5 +52,9 @@ enum mh_result {
  */
 const char *
 mh_result_to_str(enum mh_result res);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

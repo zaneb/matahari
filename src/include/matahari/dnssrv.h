@@ -26,6 +26,10 @@
 #ifndef __MH_DNSSRV_H__
 #define __MH_DNSSRV_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/types.h>
 #include <inttypes.h>
 #include <glib.h>
@@ -108,5 +112,9 @@ mh_dnssrv_record_get_weight(const struct mh_dnssrv_record *record);
  */
 void
 mh_dnssrv_record_free(gpointer data);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __MH_DNSSRV_H__ */
