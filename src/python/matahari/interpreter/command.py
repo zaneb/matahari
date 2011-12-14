@@ -36,10 +36,12 @@ A group of optional parameters can be passed as a tuple. For example:
             print 'Optional:', param
         print 'Mandatory:', mandatory
 
-Note that if the optional paramters are not supplied, they will each have
+Note that if the optional parameters are not supplied, they will each have
 the value None when passed to the handler function. This is done (instead of
 passing an empty list) so that tuple unpacking can be used as shown in the
-example.
+example. If a validation function has an attribute named "default", this
+default value will be used instead of None. If the default attribute is
+callable, it will be called to calculate the default.
 
 A variable argument list can be implemented by passing a list as the final
 parameter, thus:
@@ -50,7 +52,9 @@ parameter, thus:
         print 'Params:' params
 
 A least one argument must be supplied for a variable argument list. To allow
-a list with zero items, make it optional by wrapping it in a tuple.
+a list with zero items, make it optional by wrapping it in a tuple. In the case
+of variable argument lists, the default return value is an empty list (rather
+than None as for other parameters).
 
 The docstring of the command handler function will be used to display help
 about the command to the user on request.
@@ -401,6 +405,9 @@ class Argument(object):
         arglist = chain.from_iterable(imap(lambda a: a.match(values), args))
         return takewhile(lambda p: p is not None, arglist)
 
+    def default(self):
+        return None
+
     def __iter__(self):
         yield self
 
@@ -428,6 +435,14 @@ class Parameter(Argument):
             except ValueError, e:
                 raise InvalidArgumentException('Invalid argument value (%s)' % e)
         return arg
+
+    def default(self):
+        if hasattr(self.param, 'default'):
+            if callable(self.param.default):
+                return self.param.default()
+            else:
+                return self.param.default
+        return None
 
     def complete(self, value):
         if hasattr(self.param, 'complete') and callable(self.param.complete):
@@ -504,8 +519,11 @@ class OptionalArguments(ArgumentList):
     def __str__(self):
         return '(%s)' % ArgumentList.__str__(self)
 
+    def default(self):
+        return [a.default() for a in self.args]
+
     def match(self, values):
-        args = [None] * len(self.args)
+        args = self.default()
         if values:
             values_copy = list(values)
             try:
@@ -538,6 +556,9 @@ class RepeatedArguments(ArgumentList):
                                starmap(self.collate,
                                        repeat((self.args, values))))
         return chain.from_iterable(iterations)
+
+    def default(self):
+        return []
 
 
 import unittest
@@ -712,7 +733,7 @@ class CommandTest(unittest.TestCase):
         def foo(kwfoo, param, args):
             self.assertEqual(kwfoo, 'foo')
             self.assertEqual(param, 'bar')
-            self.assertIs(args[0], None)
+            self.assertEqual(args[0], [])
         handler = Command('foo', 'bar', ([int],))(foo)
         handler('bar')
         self.assertEqual(foo.calls, 1)
@@ -720,6 +741,34 @@ class CommandTest(unittest.TestCase):
     def test_list_optional_kw_err(self):
         handler = Command('foo', ('bar', ['PARAMS']))(self.nullCmd)
         self.assertRaises(InvalidCommandException, handler, 'bar')
+
+    def test_default_param(self):
+        class Answer(int):
+            default = 42
+
+        @self.CallCounter
+        def foo(kwfoo, param, args):
+            self.assertEqual(kwfoo, 'foo')
+            self.assertEqual(param, 'bar')
+            self.assertEqual(args[0], 42)
+        handler = Command('foo', 'bar', (Answer,))(foo)
+        handler('bar')
+        self.assertEqual(foo.calls, 1)
+
+    def test_default_param_func(self):
+        class Answer(int):
+            @staticmethod
+            def default():
+                return 42
+
+        @self.CallCounter
+        def foo(kwfoo, param, args):
+            self.assertEqual(kwfoo, 'foo')
+            self.assertEqual(param, 'bar')
+            self.assertEqual(args[0], 42)
+        handler = Command('foo', 'bar', (Answer,))(foo)
+        handler('bar')
+        self.assertEqual(foo.calls, 1)
 
 
 class CompletionTest(unittest.TestCase):
