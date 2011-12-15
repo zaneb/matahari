@@ -3,7 +3,7 @@ Matahari Shell modes.
 """
 
 from interpreter import *
-import shelltypes
+import shelltypes as types
 
 
 class RootMode(Mode):
@@ -14,8 +14,15 @@ class RootMode(Mode):
         self.state = state
 
         select_wrapper = Command('select', 'host',
-                                 [shelltypes.Host(self.state.manager)])
+                                 [types.Host(self.state)])
         self += select_wrapper(self.select)
+
+        pkg_state = types.SharedInfo('org.matahariproject')
+        class_wrapper = Command('class',
+                                ('package',
+                                 types.Package(self.state, pkg_state)),
+                                types.Class(self.state, pkg_state))
+        self += class_wrapper(self.package_class)
 
     def getFilteredMode(self):
         return FilteredMode(self.state)
@@ -24,7 +31,7 @@ class RootMode(Mode):
         return ClassMode(self.state)
 
     @Command('show', 'hosts')
-    def show_hosts(self, kw_show, kw_hosts):
+    def show_hosts(self, *kws):
         """Show the list of connected hosts."""
         self.write(*[str(h) for h in self.state.list_hosts()])
 
@@ -38,11 +45,8 @@ class RootMode(Mode):
         self.state.set_hosts(arg_hosts)
         self.shell.set_mode(self.getFilteredMode())
 
-    @Command('class', ('package', 'PACKAGE'), 'CLASS')
     def package_class(self, kw_class, (kw_package, package), klass):
         """ Select an object class to operate on."""
-        if kw_package is None:
-            package = 'org.matahariproject'
         self.state.set_class(klass, package)
         self.shell.set_mode(self.getClassMode())
 
