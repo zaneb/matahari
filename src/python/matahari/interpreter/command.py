@@ -450,7 +450,7 @@ class Parameter(Argument):
         try:
             if value:
                 parsed = self(value)
-            return ['']
+            return [value and (value + ' ')]
         except InvalidArgumentException:
             return []
 
@@ -812,14 +812,14 @@ class CompletionTest(unittest.TestCase):
     def test_param(self):
         h = self.handler('foo', 'PARAM')
         self.assertCompletion(h, 'foo ', [''])
-        self.assertCompletion(h, 'foo b', [''])
+        self.assertCompletion(h, 'foo b', ['b '])
         self.assertCompletion(h, 'foo bar ', [])
 
     def test_param_validator(self):
         h = self.handler('foo', int)
         self.assertCompletion(h, 'foo ', [''])
         self.assertCompletion(h, 'foo b', [])
-        self.assertCompletion(h, 'foo 1', [''])
+        self.assertCompletion(h, 'foo 1', ['1 '])
         self.assertCompletion(h, 'foo 123 ', [])
 
     def test_param_suggestor(self):
@@ -841,17 +841,17 @@ class CompletionTest(unittest.TestCase):
     def test_multiple_param(self):
         h = self.handler('foo', 'PARAM', 'PARAM2')
         self.assertCompletion(h, 'foo ', [''])
-        self.assertCompletion(h, 'foo b', [''])
+        self.assertCompletion(h, 'foo b', ['b '])
         self.assertCompletion(h, 'foo bar ', [''])
-        self.assertCompletion(h, 'foo bar baz', [''])
+        self.assertCompletion(h, 'foo bar baz', ['baz '])
         self.assertCompletion(h, 'foo bar baz ', [])
 
     def test_opt_args(self):
         h = self.handler('foo', ('bar', 'PARAM1'), 'PARAM2')
         self.assertCompletion(h, 'foo ', ['bar ', ''])
-        self.assertCompletion(h, 'foo b', ['bar ', ''])
+        self.assertCompletion(h, 'foo b', ['bar ', 'b '])
         self.assertCompletion(h, 'foo bar ', [''])
-        self.assertCompletion(h, 'foo quux', [''])
+        self.assertCompletion(h, 'foo quux', ['quux '])
         self.assertCompletion(h, 'foo quux ', [])
 
     def test_multiple_opt_args(self):
@@ -866,11 +866,11 @@ class CompletionTest(unittest.TestCase):
     def test_opt_kw(self):
         h = self.handler('foo', ('bar',), 'PARAM')
         self.assertCompletion(h, 'foo ', ['bar ', ''])
-        self.assertCompletion(h, 'foo b', ['bar ', ''])
+        self.assertCompletion(h, 'foo b', ['bar ', 'b '])
         self.assertCompletion(h, 'foo bar ', [''])
-        self.assertCompletion(h, 'foo bar quux', [''])
+        self.assertCompletion(h, 'foo bar quux', ['quux '])
         self.assertCompletion(h, 'foo bar quux ', [])
-        self.assertCompletion(h, 'foo quux', [''])
+        self.assertCompletion(h, 'foo quux', ['quux '])
         self.assertCompletion(h, 'foo quux ', [])
 
     def test_multiple_opt_kw_first(self):
@@ -899,11 +899,11 @@ class CompletionTest(unittest.TestCase):
         self.assertCompletion(h, 'foo ', ['bar '])
         self.assertCompletion(h, 'foo bar', ['bar '])
         self.assertCompletion(h, 'foo bar ', [''])
-        self.assertCompletion(h, 'foo bar baz', [''])
+        self.assertCompletion(h, 'foo bar baz', ['baz '])
         self.assertCompletion(h, 'foo bar baz ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg', [''])
+        self.assertCompletion(h, 'foo bar baz blarg', ['blarg '])
         self.assertCompletion(h, 'foo bar baz blarg ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg wibble', [''])
+        self.assertCompletion(h, 'foo bar baz blarg wibble', ['wibble '])
         self.assertCompletion(h, 'foo bar baz blarg wibble ', [''])
 
     def test_list_optional(self):
@@ -911,11 +911,11 @@ class CompletionTest(unittest.TestCase):
         self.assertCompletion(h, 'foo ', ['bar '])
         self.assertCompletion(h, 'foo bar', ['bar '])
         self.assertCompletion(h, 'foo bar ', [''])
-        self.assertCompletion(h, 'foo bar baz', [''])
+        self.assertCompletion(h, 'foo bar baz', ['baz '])
         self.assertCompletion(h, 'foo bar baz ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg', [''])
+        self.assertCompletion(h, 'foo bar baz blarg', ['blarg '])
         self.assertCompletion(h, 'foo bar baz blarg ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg wibble', [''])
+        self.assertCompletion(h, 'foo bar baz blarg wibble', ['wibble '])
         self.assertCompletion(h, 'foo bar baz blarg wibble ', [''])
 
     def test_list_kw_optional(self):
@@ -925,9 +925,9 @@ class CompletionTest(unittest.TestCase):
         self.assertCompletion(h, 'foo bar ', ['baz '])
         self.assertCompletion(h, 'foo bar baz', ['baz '])
         self.assertCompletion(h, 'foo bar baz ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg', [''])
+        self.assertCompletion(h, 'foo bar baz blarg', ['blarg '])
         self.assertCompletion(h, 'foo bar baz blarg ', [''])
-        self.assertCompletion(h, 'foo bar baz blarg wibble', [''])
+        self.assertCompletion(h, 'foo bar baz blarg wibble', ['wibble '])
         self.assertCompletion(h, 'foo bar baz blarg wibble ', [''])
 
 
