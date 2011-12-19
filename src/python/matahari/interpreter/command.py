@@ -126,8 +126,11 @@ class CommandHandler(object):
 
     def help(self):
         """Return the help string for the command."""
+        lines = [' > %s\n' % (str(self),)]
         doc = self._trimdoc(self.do.__doc__)
-        return ' > %s\n\n%s\n' % (str(self), doc)
+        if doc:
+            lines.append(doc + '\n')
+        return '\n'.join(lines)
 
     def complete(self, text, line, begidx, endidx):
         """Return a list of tab-completion options for the command."""
@@ -230,7 +233,7 @@ class CommandGroupHandler(object):
 
     def help(self):
         """Return the help string for the command."""
-        return '\n'.join(c.help() for c in self.cmds)
+        return '\n\n'.join(c.help() for c in self.cmds)
 
     def complete(self, text, line, begidx, endidx):
         """Return a list of tab-completion options for the command."""
