@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+
+import matahari.shell
+
+def main():
+    shell = matahari.shell.MatahariShell()
+    shell()
+
+if __name__ == '__main__':
+    main()

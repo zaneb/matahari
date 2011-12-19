@@ -6,7 +6,6 @@ macro(py_module MODULE DIRECTORY)
          DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY})
 
     # Compile .pyc and .pyo files
-    execute_process(COMMAND echo "PYTHON_EXECUTABLE = ${PYTHON_EXECUTABLE}")
     execute_process(COMMAND ${PYTHON_EXECUTABLE} -m py_compile ${MODULE}.py
                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${DIRECTORY})
     execute_process(COMMAND ${PYTHON_EXECUTABLE} -O -m py_compile ${MODULE}.py
@@ -23,8 +22,20 @@ if(WITH-QMF)
                     OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-    py_module(__init__ matahari)
-    py_module(rpc_server matahari)
+    py_module(__init__     matahari)
+    py_module(rpc_server   matahari)
+    py_module(core         matahari)
+    py_module(api          matahari)
+    py_module(__init__     matahari/shell)
+    py_module(mode         matahari/shell)
+    py_module(types        matahari/shell)
+    py_module(__init__     matahari/shell/interpreter)
+    py_module(interpreter  matahari/shell/interpreter)
+    py_module(mode         matahari/shell/interpreter)
+    py_module(command      matahari/shell/interpreter)
+
+    install(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/mhsh
+            DESTINATION bin)
 
 endif(WITH-QMF)
 

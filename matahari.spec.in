@@ -167,6 +167,15 @@ Requires:       python-qpid-qmf
 %description python
 Python libraries for Matahari
 
+%package shell
+License:        GPLv2+
+Summary:        Matahari Shell (mhsh)
+Group:          Applications/System
+Requires:       %{name}-python = %{version}-%{release}
+
+%description shell
+Interactive shell for accessing Matahari agents
+
 %package host
 License:        GPLv2+
 Summary:        QMF agent for remote hosts
@@ -529,6 +538,17 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{python_sitelib}/matahari/*.py
 %{python_sitelib}/matahari/*.pyc
 %{python_sitelib}/matahari/*.pyo
+
+%files shell
+%defattr(644, root, root, 755)
+%doc AUTHORS COPYING
+%{_bindir}/mhsh
+%{python_sitelib}/matahari/shell/*.py
+%{python_sitelib}/matahari/shell/*.pyc
+%{python_sitelib}/matahari/shell/*.pyo
+%{python_sitelib}/matahari/shell/interpreter/*.py
+%{python_sitelib}/matahari/shell/interpreter/*.pyc
+%{python_sitelib}/matahari/shell/interpreter/*.pyo
 
 %files network
 %defattr(644, root, root, 755)
