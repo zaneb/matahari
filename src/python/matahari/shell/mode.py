@@ -3,7 +3,7 @@ Matahari Shell modes.
 """
 
 from interpreter import *
-import shelltypes as types
+import types
 
 
 QMF_ACCESS_MODES = (READ_CREATE, READ_WRITE, READ_ONLY) = range(1, 4)

@@ -538,14 +538,17 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{python_sitelib}/matahari/*.py
 %{python_sitelib}/matahari/*.pyc
 %{python_sitelib}/matahari/*.pyo
-%{python_sitelib}/matahari/interpreter/*.py
-%{python_sitelib}/matahari/interpreter/*.pyc
-%{python_sitelib}/matahari/interpreter/*.pyo
 
 %files shell
 %defattr(644, root, root, 755)
 %doc AUTHORS COPYING
 %{_bindir}/mhsh
+%{python_sitelib}/matahari/shell/*.py
+%{python_sitelib}/matahari/shell/*.pyc
+%{python_sitelib}/matahari/shell/*.pyo
+%{python_sitelib}/matahari/shell/interpreter/*.py
+%{python_sitelib}/matahari/shell/interpreter/*.pyc
+%{python_sitelib}/matahari/shell/interpreter/*.pyo
 
 %files network
 %defattr(644, root, root, 755)
