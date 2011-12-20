@@ -1,3 +1,4 @@
+if(NOT WIN32)
 FIND_PACKAGE(PythonInterp)
 
 macro(py_module MODULE DIRECTORY)
@@ -38,4 +39,5 @@ if(WITH-QMF)
             DESTINATION bin)
 
 endif(WITH-QMF)
+endif(NOT WIN32)
 

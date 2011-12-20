@@ -1,6 +1,9 @@
 # Library
 
-set(LIBS mcommon mhost mnetwork mrpc mservice msysconfig)
+set(LIBS mcommon mhost mnetwork mservice msysconfig)
+if(NOT WIN32)
+    set(LIBS ${LIBS} mrpc)
+endif(NOT WIN32)
 include_directories(${pcre_INCLUDE_DIRS})
 
 # See http://sourceware.org/autobook/autobook/autobook_91.html for
@@ -22,9 +25,11 @@ add_library (mnetwork SHARED network.c  network_${VARIANT}.c)
 set_target_properties(mnetwork PROPERTIES SOVERSION 1.0.0)
 target_link_libraries(mnetwork ${pcre_LIBRARIES} mcommon ${SIGAR} ${glib_LIBRARIES})
 
+if(NOT WIN32)
 add_library (mrpc SHARED rpc.c rpc-python.c)
 set_target_properties(mrpc PROPERTIES SOVERSION 1.0.0)
 target_link_libraries(mrpc mcommon ${python_LIBRARIES})
+endif(NOT WIN32)
 
 add_library (mservice SHARED services.c services_${VARIANT}.c)
 set_target_properties(mservice PROPERTIES SOVERSION 1.0.0)

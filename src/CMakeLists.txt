@@ -109,8 +109,10 @@ SET(CMAKE_REQUIRED_LIBRARIES ${glib_LIBRARIES})
 check_function_exists (g_list_free_full HAVE_G_LIST_FREE_FULL)
 
 # Python
+if(NOT WIN32)
 pkg_check_modules(python REQUIRED python)
 include_directories(${python_INCLUDE_DIRS})
+endif(NOT WIN32)
 
 # cURL
 if(NOT WIN32)
