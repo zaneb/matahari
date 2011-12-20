@@ -19,6 +19,12 @@ class Mode(object):
 
     def __init__(self, *commands):
         """Initialise with an initial set of commands."""
+
+        # Avoid double initialisation
+        if hasattr(self, '__initialised'):
+            return
+        self.__initialised = True
+
         self.shell = None
         self.commands = {}
         for m in dir(type(self)):

@@ -138,20 +138,21 @@ class Manager(object):
             agents = _chain(self._agents(uuid=h.uuid()) for h in hl)
         return frozenset(agents)
 
-    def get(self, classname, package='org.matahariproject', agents=None):
+    def get(self, _class, _package='org.matahariproject',
+            _agents=None, **kwargs):
         """Get all objects of the specified type"""
-        def getObjects(**kwargs):
-            return self._session.getObjects(_class=classname,
-                                            _package=package, **kwargs)
+        def getObjects(**kws):
+            return self._session.getObjects(_class=_class,
+                                            _package=_package, **kws)
 
-        if agents is None:
-            obj = getObjects()
+        if _agents is None:
+            obj = getObjects(**kwargs)
         else:
             try:
-                al = iter(agents)
+                al = iter(_agents)
             except TypeError:
-                al = [agents]
-            obj = _chain(getObjects(_agent=a.agent()) for a in al)
+                al = [_agents]
+            obj = _chain(getObjects(_agent=a.agent(), **kwargs) for a in al)
         return tuple(obj)
 
     def invoke_method(self, objs, method, *args, **kwargs):

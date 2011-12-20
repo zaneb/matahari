@@ -18,67 +18,73 @@ class RootMode(Mode):
 
         select_wrapper = Command('select', 'host',
                                  [types.Host(self.state)])
-        self += select_wrapper(self.select)
+        self += select_wrapper(self.select_hosts)
 
         pkg_state = types.SharedInfo('org.matahariproject')
-        class_wrapper = Command('class',
+        class_wrapper = Command('select', 'class',
                                 ('package',
                                  types.Package(self.state, pkg_state)),
                                 types.Class(self.state, pkg_state))
-        self += class_wrapper(self.package_class)
+        self += class_wrapper(self.select_class)
 
     def writelist(self, objects):
         self.write(*[str(o) for o in objects])
 
-    def getFilteredMode(self):
-        return FilteredMode(self.state)
+    def getHostMode(self):
+        return HostMode(self.state)
 
     def getClassMode(self):
         return ClassMode(self.state)
 
-    @Command('show', 'hosts')
-    def show_hosts(self, *kws):
+    @Command('list', 'hosts')
+    def list_hosts(self, *kws):
         """Show the list of connected hosts."""
         self.writelist(self.state.list_hosts())
 
-    @Command('show', 'agents')
-    def show_agents(self, *kws):
+    @Command('list', 'agents')
+    def list_agents(self, *kws):
         """Show the list of connected agents."""
         self.writelist(self.state.agents())
 
-    def select(self, kw_select, kw_host, *arg_hosts):
-        """ Select a set of hosts to restrict commands to."""
-        self.state.set_hosts(arg_hosts)
-        self.shell.set_mode(self.getFilteredMode())
+    @Command('show', 'selection')
+    def show_selection(self, *kws):
+        """Show the list of selected objects."""
+        self.writelist(self.state.objects)
 
-    def package_class(self, kw_class, (kw_package, package), klass):
-        """ Select an object class to operate on."""
+    @Command('clear', 'all')
+    def clear_all(self, kw_clear, kw_class):
+        """Clear all selection filters"""
+        self.state.clear_state()
+        self.shell.set_mode(RootMode(self.state))
+
+    def select_hosts(self, kw_select, kw_host, *arg_hosts):
+        """Select a set of hosts to restrict commands to."""
+        self.state.set_hosts(arg_hosts)
+        self.shell.set_mode(self.getHostMode())
+
+    def select_class(self, kw_select, kw_class, (kw_package, package), klass):
+        """Select an object class to operate on."""
         self.state.set_class(klass, package)
         self.shell.set_mode(self.getClassMode())
 
 
-class FilteredMode(RootMode):
+class HostMode(RootMode):
     """Shell mode filtered by host"""
 
     def __init__(self, state):
         RootMode.__init__(self, state)
 
-    def getUnfilteredMode(self):
+    def getNoHostMode(self):
         return RootMode(self.state)
 
     def getClassMode(self):
-        return FilteredClassMode(self.state)
+        return HostClassMode(self.state)
 
-    @Command('clear', 'selection')
-    def clear_selection(self, kw_clear, kw_selection):
+    @Command('clear', 'host')
+    def clear_host(self, kw_clear, kw_selection):
         """Clear the current host selection."""
         self.state.set_hosts(None)
-        self.shell.set_mode(self.getUnfilteredMode())
-
-    @Command('show', 'selection')
-    def show_selection(self, *kws):
-        """Show the current host selection."""
-        self.writelist(self.state.hosts)
+        self.shell.set_mode(self.getNoHostMode())
 
     def prompt(self):
         return '(host)'
@@ -164,6 +170,30 @@ class SetPropertyHandler(object):
         doc = "Set the value of the %s property for the selected objects"
         return (doc % (str(self._arg),)) + '\nDetails:\n' + self._arg.help()
 
+class FilterPropertyHandler(object):
+    """CLI handler for setting an object property"""
+
+    def __new__(cls, mode, prop):
+        handler = super(FilterPropertyHandler, cls).__new__(cls, mode, prop)
+        FilterPropertyHandler.__init__(handler, mode, prop)
+        wrapper = Command('select', 'property', repr(prop), handler._arg)
+        return wrapper(handler)
+
+    def __init__(self, mode, prop):
+        self._mode = mode
+        self._prop = prop
+        self._arg = types.QMFProperty(prop)
+        self.__name__ = 'filter_property'
+        self.__doc__ = self.help()
+
+    def __call__(self, kw_select, kw_property, arg_property, arg_value):
+        self._mode.state.set_property_filter(arg_property, arg_value)
+        self._mode.shell.set_mode(self._mode)
+
+    def help(self):
+        doc = "Select objects with a specified value for their %s property"
+        return (doc % (str(self._arg),)) + '\nDetails:\n' + self._arg.help()
+
 
 class ClassMode(RootMode):
     """Shell mode filtered by QMF class."""
@@ -177,44 +207,50 @@ class ClassMode(RootMode):
             if int(prop.access) == READ_WRITE:
                 self += SetPropertyHandler(self, prop)
 
+            self += FilterPropertyHandler(self, prop)
+
         for stat in self.state.objects._statistics():
             self += GetPropertyHandler(self, stat, True)
 
         for method in self.state.objects._methods():
             self += CallMethodHandler(self, method)
 
-    def getFilteredMode(self):
-        return FilteredClassMode(self.state)
+    def getHostMode(self):
+        return HostClassMode(self.state)
 
-    def getUnclassifiedMode(self):
+    def getNoClassMode(self):
         return RootMode(self.state)
 
     @Command('clear', 'class')
     def clear_class(self, kw_clear, kw_class):
+        """Clear the current class selection"""
         self.state.set_class(None, None)
-        self.shell.set_mode(self.getUnclassifiedMode())
+        self.shell.set_mode(self.getNoClassMode())
 
-    @Command('select', 'property', 'PROPERTY', 'VALUE')
-    def select_property(self, kw_select, kw_property, arg_property, arg_value):
-        pass
+    @Command('clear', 'properties')
+    def clear_properties(self, kw_clear, kw_class):
+        """Clear any current property selection filters"""
+        self.state.clear_property_filter()
+        self.shell.set_mode(self)
 
     def prompt(self):
-        return '[%s]' % (self.state.selected_classname(),)
+        return '[%s]%s' % (self.state.selected_classname(),
+                           self.state._properties and '*' or '')
 
 
-class FilteredClassMode(FilteredMode, ClassMode):
+class HostClassMode(HostMode, ClassMode):
     """Shell mode filtered by host and QMF class."""
 
     def __init__(self, state):
-        FilteredMode.__init__(self, state)
+        HostMode.__init__(self, state)
         ClassMode.__init__(self, state)
 
-    def getUnfilteredMode(self):
+    def getNoHostMode(self):
         return ClassMode(self.state)
 
-    def getUnclassifiedMode(self):
-        return FilteredMode(self.state)
+    def getNoClassMode(self):
+        return HostMode(self.state)
 
     def prompt(self):
-        return FilteredMode.prompt(self) + ClassMode.prompt(self)
+        return HostMode.prompt(self) + ClassMode.prompt(self)
 
