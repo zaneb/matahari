@@ -189,6 +189,12 @@ class CommandHandler(object):
             return self
         return CommandGroupHandler(self.name, other, self)
 
+    def __cmp__(self, other):
+        return cmp(self.name, other.name) or cmp(str(self), str(other))
+
+    def __iter__(self):
+        yield self
+
     @staticmethod
     def _trimdoc(docstring):
         """Trim whitespace from a docstring."""
@@ -268,6 +274,9 @@ class CommandGroupHandler(object):
         if self.__doc__ is not None:
             self.__doc__ = self.help()
         return self
+
+    def __iter__(self):
+        return iter(self.cmds)
 
     def __repr__(self):
         return 'CommandGroupHandler(%s)' % repr(self.cmds)

@@ -46,6 +46,13 @@ class RootMode(Mode):
         """Show the list of connected agents."""
         self.writelist(self.state.agents())
 
+    @Command('list', 'commands')
+    def list_commands(self, *kws):
+        """List all available CLI commands."""
+        import itertools
+        cmds = itertools.chain.from_iterable(self.commands.values())
+        self.writelist(sorted(cmds))
+
     @Command('show', 'selection')
     def show_selection(self, *kws):
         """Show the list of selected objects."""
