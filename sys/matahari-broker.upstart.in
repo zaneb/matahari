@@ -1,0 +1,31 @@
+# matahari-broker - matahari qpidd broker daemon
+#
+# Matahari Broker is an AMQP broker. It receives, stores, routes and
+# forwards messages using the AMQP protcol.
+
+description "Matahari broker"
+
+start on runlevel [2345]
+stop on runlevel [06]
+
+expect fork
+respawn
+
+pre-start script
+	mkdir -p -m0775 /var/lib/matahari
+	chgrp qpidd /var/lib/matahari
+end script
+
+script
+	if [ -f @sysconfdir@/default/matahari ]; then
+		. @sysconfdir@/default/matahari
+	fi
+	if [ -f @sysconfdir@/default/matahari-broker ]; then
+		. @sysconfdir@/default/matahari-broker
+	fi
+	if [ -f @sysconfdir@/default/matahari-vios-proxy ]; then
+		. @sysconfdir@/default/matahari-vios-proxy
+	fi
+
+	exec start-stop-daemon --start --quiet --chuid qpidd --exec /usr/sbin/matahari-brokerd -- $QPIDD_OPTIONS
+end script
