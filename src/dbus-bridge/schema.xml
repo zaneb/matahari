@@ -12,5 +12,11 @@
             <arg name="args"        type="list" dir="I" />
             <arg name="results"     type="list" dir="O" />
         </method>
+
+        <method name="add_dbus_object">
+            <arg name="bus_name"    type="sstr" dir="I" />
+            <arg name="object_path" type="sstr" dir="I" />
+            <arg name="result"      type="int64"  dir="O" />
+        </method>
     </class>
 </schema>
