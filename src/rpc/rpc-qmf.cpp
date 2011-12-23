@@ -24,6 +24,7 @@
 #include "config.h"
 
 #include <set>
+#include <sstream>
 #include "matahari/agent.h"
 #include "matahari/object.h"
 #include <qmf/Data.h>
@@ -117,16 +118,23 @@ void RPCAgent::addPlugin(qmf::AgentSession session, mh_rpc_plugin_t& plugin)
         for (char **p = procs; *p; p++) {
             qmf::SchemaMethod method(*p);
 
+            std::stringstream desc;
+            desc << "Invoke the " << *p << " function in the plugin.";
+            method.setDesc(desc.str());
+
             qmf::SchemaProperty args("args", qmf::SCHEMA_DATA_LIST);
             args.setDirection(qmf::DIR_IN);
+            args.setDesc("List of positional arguments in JSON format.");
             method.addArgument(args);
 
             qmf::SchemaProperty kwargs("kwargs", qmf::SCHEMA_DATA_MAP);
             kwargs.setDirection(qmf::DIR_IN);
+            kwargs.setDesc("Map of named arguments in JSON format.");
             method.addArgument(kwargs);
 
             qmf::SchemaProperty result("result", qmf::SCHEMA_DATA_STRING);
             result.setDirection(qmf::DIR_OUT);
+            result.setDesc("Return value in JSON format.");
             method.addArgument(result);
 
             schema.addMethod(method);
