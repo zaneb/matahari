@@ -74,7 +74,9 @@ class RootMode(Mode):
     @Command('show', 'selection')
     def show_selection(self, *kws):
         """Show the list of selected objects."""
-        self.writelist(self.state.objects)
+        selection = self.state.objects
+        if selection is not None:
+            self.writelist(selection)
 
     @Command('clear', 'all')
     def clear_all(self, kw_clear, kw_class):
