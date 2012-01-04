@@ -86,12 +86,11 @@ class HostApiTests(unittest.TestCase):
 
     def test_wordsize_property(self):
         value = connection.props.get('wordsize')
+        uname = cmd.getoutput("uname -a")
         word_size = 0
-        if cmd.getoutput("uname -a | awk '{print $12}'") == "i686":
+        if "i386" in uname or "i686" in uname:
             word_size = 32
-        elif cmd.getoutput("uname -a | awk '{print $12}'") == "i386":
-            word_size = 32
-        elif cmd.getoutput("uname -a | awk '{print $12}'") == "x86_64":
+        elif "x86_64" in uname or "s390x" in uname or "ppc64" in uname:
             word_size = 64
         self.assertEquals(value, word_size, "wordsize not matching")
 
@@ -105,14 +104,24 @@ class HostApiTests(unittest.TestCase):
 
     def test_cpu_count_property(self):
         value = connection.props.get('cpu_count')
-        self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processor | wc -l")), "cpu count not matching")
+        uname = cmd.getoutput("uname -a")
+
+        if "s390x" in uname:
+	    self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processors | awk '{ print $4 }'")), "cpu count not matching")
+        else:
+            self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processor | wc -l")), "cpu count not matching")
 
     def test_cpu_cores_property(self):
         # XXX Core count is still busted in F15, sigar needs to be updated
         if os.path.exists("/etc/fedora-release") and open("/etc/fedora-release", "r").read().strip() == "Fedora release 15 (Lovelock)":
             return
         value = str(connection.props.get('cpu_cores'))
-        core_count = cmd.getoutput("cat /proc/cpuinfo | grep \"core id\" | uniq | wc -l").strip()
+
+        if "s390x" in cmd.getoutput("uname -a"):
+            core_count = cmd.getoutput("cat /proc/cpuinfo | grep processors | awk '{ print $4 }'").strip()
+        else:
+            core_count = cmd.getoutput("cat /proc/cpuinfo | grep \"core id\" | uniq | wc -l").strip()
+
         if value != core_count:
             sys.stderr.write("cpu_cores: '%s', expected '%s'\n" %
                              (value, core_count))
@@ -120,12 +129,24 @@ class HostApiTests(unittest.TestCase):
 
     def test_cpu_model_property(self):
         value = connection.props.get('cpu_model')
-        cmdline = cmd.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | awk -F: {'print $2'}")
-        self.assertTrue(value in cmdline, "cpu model not matching")
+        uname = cmd.getoutput("uname -a")
+
+	if "s390x" in uname:
+	    self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'processor 0' | awk -F, '{ print $3 }' | awk -F= '{ print $2 }'").strip(), "cpu model not matching")
+        elif "ppc64" in uname:
+            self.assertTrue(value in cmd.getoutput("cat /proc/cpuinfo | grep cpu | head -1"), "cpu model not matching")
+	else:
+	    self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | awk -F: {'print $2'}").strip(), "cpu model not matching")
 
     def test_cpu_flags_property(self):
         value = connection.props.get('cpu_flags')
-        self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'flags' | head -1 | awk -F: {'print $2'}").strip(), "cpu flags not matching")
+        uname = cmd.getoutput("uname -a")
+        if "s390x" in uname:
+            self.assertEquals(value.strip(), cmd.getoutput("cat /proc/cpuinfo | grep 'features' | head -1 | awk -F: {'print $2'}").strip(), "cpu flags not matching")
+        elif "ppc64" in uname:
+            self.assertTrue(value in cmd.getoutput("cat /proc/cpuinfo | grep cpu | head -1"), "cpu flags not matching")
+        else:
+            self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'flags' | head -1 | awk -F: {'print $2'}").strip(), "cpu flags not matching")
 
     def test_update_interval_property(self):
         value = connection.props.get('update_interval')
@@ -178,9 +199,7 @@ class HostApiTests(unittest.TestCase):
 
     def test_get_uuid_empty_string(self):
         result = host.get_uuid('')
-        result2 = host.get_uuid('filesystem')
-        self.assertEqual(result.get('uuid'), result2.get('uuid'),
-                         "empty string UUID not the same as 'filesystem' UUID")
+        self.assertEqual("invalid-lifetime", result.get('uuid'), "empty string UUID not the same as 'filesystem' UUID")
 
     def test_get_uuid_zero_parameters(self):
         try:
