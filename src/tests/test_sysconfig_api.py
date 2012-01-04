@@ -39,6 +39,8 @@ import threading
 import SimpleHTTPServer
 import SocketServer
 import errno
+from nose.plugins.attrib import attr
+
 
 # The docs for SocketServer show an allow_reuse_address option, but I
 # can't seem to make it work, so screw it, randomize the port.
@@ -224,21 +226,25 @@ class TestSysconfigApi(unittest.TestCase):
     # TODO: need to handle upstream vs rhel difference
 
     # TEST - Augeas
+    @attr('augeas')
     def test_run_uri_good_url_augeas(self):
         results = wrapper('uri', testAugeasFileUrl, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
         self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
         self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
 
+    @attr('augeas')
     def test_run_uri_http_url_not_found_augeas(self):
         self.assertRaises(QmfAgentException, wrapper, 'uri', testAugeasFileUrl + "_bad", 0, 'augeas', testUtil.getRandomKey(5))
 
+    @attr('augeas')
     def test_run_uri_good_file_augeas(self):
         results = wrapper('uri', 'file://'+testAugeasFileWithPath, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
         self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
         self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
 
+    @attr('augeas')
     def test_run_uri_file_url_not_found(self):
         self.assertRaises(QmfAgentException, wrapper, 'uri', 'file://'+testAugeasFile, 0, 'augeas', testUtil.getRandomKey(5))
 
@@ -273,12 +279,14 @@ class TestSysconfigApi(unittest.TestCase):
         self.assertTrue( 0 == checkFile(testPuppetFileWithPath, origFilePerms, origFileOwner, origFileGroup), "file properties not expected")
 
     # TEST - Augeas
+    @attr('augeas')
     def test_run_string_good_augeas(self):
         results = wrapper('string', augeasFileContents, 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = results.split('\n')
         self.assertEqual(tokens[0], 'OK', "result: %s != OK" % tokens[0])
         self.assertTrue(tokens[1].startswith("%s = " % augeasQuery))
 
+    @attr('augeas')
     def test_run_string_bad_augeas(self):
         result = wrapper('string', 'bad augeas query', 0, 'augeas', testUtil.getRandomKey(5)).get('status')
         tokens = result.split('\n')
@@ -286,10 +294,12 @@ class TestSysconfigApi(unittest.TestCase):
 
     # TEST - query()
     # ================================================================
+    @attr('augeas')
     def test_query_good_augeas(self):
         result = sysconfig.query(augeasQuery, 0, 'augeas').get('data')
         self.assertNotEqual(result, 'unknown', "result: %s == unknown" % result)
 
+    @attr('augeas')
     def test_query_bad_augeas(self):
         result = sysconfig.query('bad augeas query', 0, 'augeas').get('data')
         self.assertEqual(result, 'unknown', "result: %s != unknown" % result)
