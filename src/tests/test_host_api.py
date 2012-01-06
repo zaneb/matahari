@@ -107,7 +107,7 @@ class HostApiTests(unittest.TestCase):
         uname = cmd.getoutput("uname -a")
 
         if "s390x" in uname:
-	    self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processors | awk '{ print $4 }'")), "cpu count not matching")
+            self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processors | awk '{ print $4 }'")), "cpu count not matching")
         else:
             self.assertEquals(value, int(cmd.getoutput("cat /proc/cpuinfo | grep processor | wc -l")), "cpu count not matching")
 
@@ -122,21 +122,21 @@ class HostApiTests(unittest.TestCase):
         else:
             core_count = cmd.getoutput("cat /proc/cpuinfo | grep \"core id\" | uniq | wc -l").strip()
 
-        if value != core_count:
-            sys.stderr.write("cpu_cores: '%s', expected '%s'\n" %
-                             (value, core_count))
-        self.assertEquals(value, core_count, "cpu core count not matching")
+        self.assertEquals(value, core_count, "cpu core count ("+value+") not matching expected ("+core_count+")")
 
     def test_cpu_model_property(self):
         value = connection.props.get('cpu_model')
         uname = cmd.getoutput("uname -a")
 
-	if "s390x" in uname:
-	    self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'processor 0' | awk -F, '{ print $3 }' | awk -F= '{ print $2 }'").strip(), "cpu model not matching")
+        if "s390x" in uname:
+            expected = cmd.getoutput("cat /proc/cpuinfo | grep 'processor 0' | awk -F, '{ print $3 }' | awk -F= '{ print $2 }'").strip()
+            self.assertEquals(value, expected, "cpu model ("+value+") not matching expected ("+expected+")")
         elif "ppc64" in uname:
-            self.assertTrue(value in cmd.getoutput("cat /proc/cpuinfo | grep cpu | head -1"), "cpu model not matching")
-	else:
-	    self.assertEquals(value, cmd.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | awk -F: {'print $2'}").strip(), "cpu model not matching")
+            expected = cmd.getoutput("cat /proc/cpuinfo | grep cpu | head -1")
+            self.assertTrue(value in expected, "cpu model ("+value+") not found in ("+expected+")")
+        else:
+            expected = cmd.getoutput("cat /proc/cpuinfo | grep 'model name' | head -1 | awk -F: {'print $2'}").strip()
+            self.assertEquals(value, expected, "cpu model ("+value+") not matching expected ("+expected+")")
 
     def test_cpu_flags_property(self):
         value = connection.props.get('cpu_flags')
@@ -181,7 +181,7 @@ class HostApiTests(unittest.TestCase):
 
     def test_get_uuid_Reboot_lifetime(self):
         result = host.get_uuid('Reboot')
-        self.assertNotEqual(result.get('uuid'),'not-available', "not-available text not found on parm 'lifetime'")
+        self.assertNotEqual(result.get('uuid'),' not-available', "Reboot lifetime returned 'not-available' ")
 
     def test_get_uuid_unset_Custom_lifetime(self):
         cmd.getoutput("rm -rf /etc/custom-machine-id")
@@ -191,15 +191,15 @@ class HostApiTests(unittest.TestCase):
         connection = HostTestsSetup()
         host = connection.host
         result = host.get_uuid('Custom')
-        self.assertEqual(result.get('uuid'),'not-available', "not-available text not found on parm 'lifetime'")
+        self.assertEqual(result.get('uuid'), 'not-available', "unset Custom liftetime not returning 'not-available' ("+result.get('uuid')+")")
 
     def test_get_uuid_unknown_lifetime(self):
         result = host.get_uuid('lifetime')
-        self.assertEqual(result.get('uuid'),'invalid-lifetime', "invalid-lifetime text not found on parm 'lifetime'")
+        self.assertEqual(result.get('uuid'), 'invalid-lifetime', "parm 'lifetime' not returning 'invalid-lifetime' ("+result.get('uuid')+")")
 
     def test_get_uuid_empty_string(self):
         result = host.get_uuid('')
-        self.assertEqual("invalid-lifetime", result.get('uuid'), "empty string UUID not the same as 'filesystem' UUID")
+        self.assertEqual(result.get('uuid'), 'invalid-lifetime', "empty string not returning 'invalid-lifetime' ("+result.get('uuid')+")")
 
     def test_get_uuid_zero_parameters(self):
         try:
@@ -214,17 +214,17 @@ class HostApiTests(unittest.TestCase):
         test_uuid = testUtil.getRandomKey(20)
         host.set_uuid('Custom', test_uuid)
         result = host.get_uuid('Custom')
-        self.assertEqual(result.get('uuid'), test_uuid, "uuid value not matching expected("+result.get('uuid')+")")
+        self.assertEqual(result.get('uuid'), test_uuid, "uuid value ("+result.get('uuid')+") not matching expected("+test_uuid+")")
         connection.reQuery()
-        self.assertEqual(connection.props.get('custom_uuid'), test_uuid, "property not matching set value")
+        self.assertEqual(connection.props.get('custom_uuid'), test_uuid, "uuid value ("+connection.props.get('uuid')+") not matching expected("+test_uuid+")")
 
     def test_set_uuid_new_Custom_lifetime(self):
         test_uuid = testUtil.getRandomKey(20)
         host.set_uuid('Custom', test_uuid)
         result = host.get_uuid('Custom')
-        self.assertEqual(result.get('uuid'), test_uuid, "uuid value not matching expected("+result.get('uuid')+")")
+        self.assertEqual(result.get('uuid'), test_uuid, "uuid value ("+result.get('uuid')+") not matching expected("+test_uuid+")")
         connection.reQuery()
-        self.assertEqual(connection.props.get('custom_uuid'), test_uuid, "property not matching set value")
+        self.assertEqual(connection.props.get('custom_uuid'), test_uuid, "uuid value ("+connection.props.get('uuid')+") not matching expected("+test_uuid+")")
 
     def test_set_uuid_Hardware_lifetime_fails(self):
         result = host.set_uuid('Hardware', testUtil.getRandomKey(20) )
