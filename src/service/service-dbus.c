@@ -463,7 +463,10 @@ void
 matahari_get_property(GObject *object, guint property_id, GValue *value,
                       GParamSpec *pspec)
 {
-    switch (property_id) {
+    switch ((enum Prop) property_id) {
+    case PROP_0:
+        // Just to silence warning
+        break;
     case PROP_SERVICES_HOSTNAME:
     case PROP_RESOURCES_HOSTNAME:
         g_value_set_string (value, mh_hostname());
@@ -472,9 +475,8 @@ matahari_get_property(GObject *object, guint property_id, GValue *value,
     case PROP_RESOURCES_UUID:
         g_value_set_string (value, mh_uuid());
         break;
-    default:
-        /* We don't have any other property... */
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+    case PROP_SERVICES_QMF_GEN_NO_CRASH:
+        // Not used in DBus module
         break;
     }
 }

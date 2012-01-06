@@ -227,7 +227,10 @@ matahari_get_property(GObject *object, guint property_id, GValue *value,
     Dict *dict;
     GValue value_value = {0, };
 
-    switch (property_id) {
+    switch ((enum Prop) property_id) {
+    case PROP_0:
+        // Just to silence warning
+        break;
     case PROP_HOST_UUID:
         g_value_set_string (value, mh_host_get_uuid(NULL));
         break;
@@ -319,9 +322,8 @@ matahari_get_property(GObject *object, guint property_id, GValue *value,
         dict_add(dict, "sleeping", &value_value);
         dict_free(dict);
         break;
-    default:
-        /* We don't have any other property... */
-        G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+    case PROP_HOST_CUSTOM_UUID:
+        g_value_set_string (value, mh_host_get_uuid("Custom"));
         break;
     }
 }
