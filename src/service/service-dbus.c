@@ -178,40 +178,6 @@ Services_status(Matahari *matahari, const char *name, unsigned int timeout,
 }
 
 gboolean
-Services_cancel(Matahari *matahari, const char *name, const char *action,
-                unsigned int interval, DBusGMethodInvocation *context)
-{
-    GError* error = NULL;
-    int res;
-
-    if (!check_authorization(SERVICES_BUS_NAME ".cancel", &error, context)) {
-        dbus_g_method_return_error(context, error);
-        g_error_free(error);
-        return FALSE;
-    }
-    res = services_action_cancel(name, action, interval);
-    dbus_g_method_return(context);
-    return res;
-}
-
-gboolean
-Services_fail(Matahari *matahari, const char *name,
-              DBusGMethodInvocation *context)
-{
-    GError* error = NULL;
-    if (!check_authorization(SERVICES_BUS_NAME ".fail", &error, context)) {
-        dbus_g_method_return_error(context, error);
-        g_error_free(error);
-        return FALSE;
-    }
-    // TODO: Implement when implemented in backend
-    error = g_error_new(MATAHARI_ERROR, MH_RES_NOT_IMPLEMENTED,
-                        "%s", mh_result_to_str(MH_RES_NOT_IMPLEMENTED));
-    dbus_g_method_return_error(context, error);
-    return TRUE;
-}
-
-gboolean
 Services_describe(Matahari *matahari, const char *name,
                   DBusGMethodInvocation *context)
 {
