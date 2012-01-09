@@ -48,6 +48,7 @@
 #include "matahari/utilities.h"
 
 #ifndef WIN32
+#include <unistd.h>
 extern "C" {
 #include <sys/socket.h>
 #include <netdb.h>
