@@ -45,6 +45,7 @@ Requires:       %{name}-host = %{version}-%{release}
 Requires:       %{name}-network = %{version}-%{release}
 Requires:       %{name}-rpc = %{version}-%{release}
 Requires:       %{name}-service = %{version}-%{release}
+Requires:       %{name}-shell = %{version}-%{release}
 Requires:       %{name}-sysconfig = %{version}-%{release}
 
 BuildRequires:  cmake
