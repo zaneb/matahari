@@ -157,8 +157,8 @@ Services_stop(Matahari *matahari, const char *name, unsigned int timeout,
 }
 
 gboolean
-Services_status(Matahari *matahari, const char *name, unsigned int interval,
-                unsigned int timeout, DBusGMethodInvocation *context)
+Services_status(Matahari *matahari, const char *name, unsigned int timeout,
+                DBusGMethodInvocation *context)
 {
     GError* error = NULL;
     svc_action_t *op;
@@ -169,7 +169,7 @@ Services_status(Matahari *matahari, const char *name, unsigned int interval,
         g_error_free(error);
         return FALSE;
     }
-    op = services_action_create(name, "status", interval, timeout);
+    op = services_action_create(name, "status", 0, timeout);
     services_action_sync(op);
     rc = op->rc;
     services_action_free(op);
