@@ -77,7 +77,7 @@ class HostApiTests(unittest.TestCase):
     def test_arch_property(self):
         value = cmd.getoutput("uname -a | awk '{print $12}'")
         qmf_value = qmf.props.get('arch')
-        self.assertEquals(qmf_value, value, "QMF os not matching")
+        self.assertEquals(qmf_value, value, "QMF arch not matching")
 
         if testUtil.haveDBus:
             dbus_value = dbus.get('arch')
@@ -305,10 +305,11 @@ class HostApiTests(unittest.TestCase):
     def test_set_uuid_new_Custom_lifetime(self):
         test_uuid = testUtil.getRandomKey(20)
         qmf.set_uuid('Custom', test_uuid)
-        result = qmf.get_uuid('Custom')
-        self.assertEqual(result.get('uuid'), test_uuid, "QMF uuid value ("+result.get('uuid')+") not matching expected("+test_uuid+")")
+        result = qmf.get_uuid('Custom').get('uuid')
+        self.assertEqual(result, test_uuid, "QMF uuid value ("+result+") not matching expected("+test_uuid+")")
         connection.reQuery()
-        self.assertEqual(qmf.props.get('custom_uuid'), test_uuid, "QMF uuid value ("+qmf.props.get('uuid')+") not matching expected("+test_uuid+")")
+        uuid_prop = qmf.props.get('custom_uuid')
+        self.assertEqual(uuid_prop, test_uuid, "QMF uuid value ("+uuid_prop+") not matching expected("+test_uuid+")")
 
         if testUtil.haveDBus:
             test_uuid = testUtil.getRandomKey(20)
