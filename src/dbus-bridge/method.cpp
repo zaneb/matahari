@@ -32,6 +32,20 @@ extern "C" {
     #include <dbus/dbus.h>
 }
 
+/**
+ * Add \p value to DBus message.
+ *
+ * \param[in] iter iterator for arguments of DBus message
+ * \param[in] value value to be added
+ * \param[in] signature signature of the message
+ *
+ * \retval TRUE if adding argument succeeds
+ * \retval FALSE otherwise
+ */
+bool
+message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
+                const char *signature);
+
 Method::Method(xmlNode *node, const Interface *iface) : interface(iface)
 {
     xmlChar *nameStr;
@@ -161,7 +175,7 @@ list<qpid::types::Variant> Method::call(const list<qpid::types::Variant> &args, 
     dbus_message_unref(message);
     dbus_message_unref(reply);
 
-    mh_debug("=======================\n");
+    mh_debug("=======================");
     return list;
 }
 
@@ -248,4 +262,130 @@ qmf::SchemaProperty Arg::toSchemaProperty() const
 bool Arg::addToMessage(DBusMessageIter *iter, const qpid::types::Variant &v) const
 {
     return message_add_arg(iter, v, type);
+}
+
+bool
+message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
+                const char *signature)
+{
+    int type = DBUS_TYPE_INVALID;
+    qpid::types::Variant::List::iterator it, end;
+    qpid::types::Variant::List list;
+    char *subsignature = NULL;
+    DBusMessageIter subiter;
+    DBusBasicValue v;
+
+    if (!signature || strlen(signature) == 0) {
+        mh_crit("Empty signature!");
+        return false;
+    }
+    int len = strlen(signature), start;
+    switch (signature[0]) {
+        case DBUS_TYPE_ARRAY:
+            try {
+                list = value.asList();
+            } catch (const qpid::types::InvalidConversion &err) {
+                mh_crit("Unable to convert value to list: %s", err.what());
+                return false;
+            }
+
+            subsignature = strdup(signature + 1);
+            mh_debug("Array<%s>: %s", subsignature, value.asString().c_str());
+
+            if (!dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, subsignature, &subiter)) {
+                mh_crit("Unable to open message iter container");
+                return false;
+            }
+
+            end = list.end();
+            for (it = list.begin(); it != end; it++) {
+                if (!message_add_arg(&subiter, *it, subsignature)) {
+                    return false;
+                }
+            }
+            if (!dbus_message_iter_close_container(iter, &subiter)) {
+                mh_crit("Unable to close DBus message iterator container");
+                // Try to continue
+            }
+            free(subsignature);
+            break;
+        case DBUS_TYPE_STRUCT:
+        case '(':
+        case DBUS_TYPE_DICT_ENTRY:
+        case '{':
+            try {
+                list = value.asList();
+            } catch (const qpid::types::InvalidConversion &err) {
+                mh_crit("Unable to convert value %s to list: %s", value.asString().c_str(), err.what());
+                return false;
+            }
+
+            start = 1;
+            if (signature[0] == '(') {
+                mh_debug("Struct<%s>: %s", signature, value.asString().c_str());
+                if (!dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &subiter)) {
+                    mh_crit("Unable to open message iter container");
+                    return false;
+                }
+            } else {
+                mh_debug("Dict<%s>: %s", signature, value.asString().c_str());
+                if (!dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY, NULL, &subiter)) {
+                    mh_crit("Unable to open message iter container");
+                    return false;
+                }
+            }
+            end = list.end();
+            for (it = list.begin(); it != end; it++) {
+                len = get_signature_item_length(signature + start);
+                subsignature = strndup(signature + start, len);
+                start += len;
+
+                if (len < 1) {
+                    mh_crit("Signature (%s) is too short\n", signature);
+                    return false;
+                }
+                if (!message_add_arg(&subiter, *it, subsignature)) {
+                    return false;
+                }
+                free(subsignature);
+            }
+            if (!dbus_message_iter_close_container(iter, &subiter)) {
+                mh_crit("Unable to close DBus message iterator container");
+                // Try to continue
+            }
+            break;
+        case DBUS_TYPE_VARIANT:
+            v = qpid_variant_to_dbus(value, &type, signature[0]);
+            char s[2];
+            s[0] = type;
+            s[1] = '\0';
+            dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, s, &subiter);
+            dbus_message_iter_append_basic(&subiter, type, &v);
+            dbus_message_iter_close_container(iter, &subiter);
+            break;
+        case DBUS_TYPE_INVALID:
+            mh_crit("Invalid type in signature, this shouldn't happen");
+            return false;
+            break;
+        default:
+            // Handle DBus basic types
+            v = qpid_variant_to_dbus(value, &type, signature[0]);
+            if (type == DBUS_TYPE_INVALID) {
+                mh_crit("Unable to convert %s to basic DBus type %c",
+                        value.asString().c_str(), signature[0]);
+                return false;
+
+            }
+            if (!dbus_message_iter_append_basic(iter, type, &v)) {
+                mh_crit("Unable to add value %s to DBus argument of type %c",
+                        value.asString().c_str(), type);
+                return false;
+            }
+    }
+    // Free the string
+    if (type == DBUS_TYPE_STRING) {
+        free(v.str);
+    }
+
+    return true;
 }

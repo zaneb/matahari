@@ -4,15 +4,16 @@ import sys
 import time
 import matahariTest as testUtil
 import unittest
-import commands as cmd
+#import commands as cmd
 import cqpid
-from qmf2 import ConsoleSession, QmfAgentException
+from qmf2 import QmfAgentException
 import cqmf2
 import dbus.service
 import threading
 
 qmf = None
 qmf_dbus = None
+connection = None
 
 start_agent_and_broker = False
 
@@ -20,8 +21,13 @@ bus_name = 'org.matahariproject.Test'
 object_path = "/org/matahariproject/Test"
 
 class DBusTestObject(dbus.service.Object):
+    """
+    DBus object against which will the DBus Bridge be tested.
+    """
     def __init__(self):
         self.config = "/etc/dbus-1/system.d/org.matahariproject.Test.conf"
+        bus = dbus.SystemBus()
+        # Create configuration file that allows to create object on systembus
         if not os.path.exists(self.config):
             f = open(self.config, "w")
             f.write("""
@@ -35,10 +41,9 @@ class DBusTestObject(dbus.service.Object):
 </busconfig>
 """)
             f.close()
-            # TODO: dbus
-            cmd.getoutput("qdbus --system org.freedesktop.DBus / org.freedesktop.DBus.ReloadConfig")
+            # Reload DBus configuration
+            bus.call_blocking("org.freedesktop.DBus", "/", "org.freedesktop.DBus", "ReloadConfig", "", [])
             time.sleep(2)
-        bus = dbus.SystemBus()
         dbus_name = dbus.service.BusName(bus_name, bus=bus)
         dbus.service.Object.__init__(self, bus, object_path, dbus_name)
         sys.stderr.write("Starting fake DBus API ...\n")
@@ -110,18 +115,22 @@ class DBusTestObject(dbus.service.Object):
                          in_signature='s',
                          out_signature='')
     def emit_simpleSignal(self, s):
-        print >>sys.stderr, "Emitting signal simpleSignal(%s)" % s
+        print "Emitting signal simpleSignal(%s)" % s
         self.simpleSignal(s)
 
     @dbus.service.method(dbus_interface='org.matahariproject.Test',
                          in_signature='biudsaiasa(is)a{is}',
                          out_signature='')
     def emit_complexSignal(self, b, i, u, d, s, a_i, a_s, a_is, d_is):
-        print >>sys.stderr, "Emitting signal complexSignal ", b, i, u, d, s, a_i, a_s, a_is, d_is
+        print "Emitting signal complexSignal ", b, i, u, d, s, a_i, a_s, a_is, d_is
         self.complexSignal(b, i, u, d, s, a_i, a_s, a_is, d_is)
 
 class DBusThread(threading.Thread):
+    """
+    DBus server for testing will be ran in separate thread.
+    """
     def run(self):
+        # Start the main loop
         from dbus.mainloop.glib import DBusGMainLoop
         from gobject import MainLoop, threads_init
         threads_init()
@@ -132,70 +141,6 @@ class DBusThread(threading.Thread):
 
     def stop(self):
         self.mainloop.quit()
-
-
-class TestsSetup(object):
-    def __init__(self, qmf_binary, agentKeyword, agentClass, dbus_binary=None, dbus_settings=[]):
-        self.thread = DBusThread()
-        self.thread.start()
-        self.qmf_agent = None
-        self.broker = None
-
-        if start_agent_and_broker:
-            self.broker = testUtil.MatahariBroker()
-            self.broker.start()
-            time.sleep(1)
-            self.qmf_agent = testUtil.MatahariAgent(qmf_binary)
-            self.qmf_agent.start()
-
-        time.sleep(1)
-
-        self._connectToBroker('localhost', '49000')
-
-        self.agentKeyword = agentKeyword
-        self.agentClass = agentClass
-        self.qmf = self._findAgent(cmd.getoutput('hostname'))
-        self.reQuery()
-
-    def tearDown(self):
-        self.thread.stop()
-        self._disconnect()
-        if self.qmf_agent is not None:
-            self.qmf_agent.stop()
-        if self.broker is not None:
-            self.broker.stop()
-        self.thread.join()
-
-    def _disconnect(self):
-        self.connection.close()
-        self.session.close()
-
-    def reQuery(self):
-        self.qmf.update()
-        self.qmf.props = self.qmf.getProperties()
-
-    def _findAgent(self, hostname):
-        loop_count = 0
-        while loop_count < 70:
-            agents = self.session.getAgents()
-            sys.stderr.write("Agents: %s\n" % str(agents))
-            for agent in agents:
-                if self.agentKeyword in str(agent):
-                    if agent.getAttributes().get('hostname') == hostname:
-                        objs = agent.query("{class:" + self.agentClass + ",package:'org.matahariproject'}")
-                        if objs and len(objs):
-                            return objs[0]
-            time.sleep(1)
-            loop_count = loop_count + 1
-        sys.exit("specific " + self.agentKeyword + " agent for " + hostname + " not found.")
-
-
-    def _connectToBroker(self, hostname, port):
-        self.connection = cqpid.Connection(hostname + ":" + port)
-        self.connection.open()
-        self.session = ConsoleSession(self.connection)
-        self.session.open()
-
 
 def sortList(l):
     """ Recursivly sort list. """
@@ -216,11 +161,23 @@ def tearDownModule():
     global connection
     connection.tearDown()
 
-class DBusBridgeTestsSetup(TestsSetup):
+class DBusBridgeTestsSetup(testUtil.TestsSetup):
+    """ Connection to QMF broker. """
     def __init__(self):
-        TestsSetup.__init__(self, "../../linux.build/src/dbus-bridge/matahari-qmf-dbus-bridged", "DBusBridge", "DBusBridge")
+        self.thread = DBusThread()
+        self.thread.start()
+        #testUtil.TestsSetup.__init__(self, "../../linux.build/src/dbus-bridge/matahari-qmf-dbus-bridged", "DBusBridge", "DBusBridge")
+        testUtil.TestsSetup.__init__(self, "./matahari-qmf-dbus-bridged-wrapper", "DBusBridge", "DBusBridge")
+
+    def tearDown(self):
+        self.thread.stop()
+        testUtil.TestsSetup.tearDown(self)
 
 class DBusBridgeBasicApiTests(unittest.TestCase):
+    """
+    Class for executing basic tests of DBusBridge. Basic tests don't require
+    permanent bridge to be created.
+    """
     def test_call_multiplyString(self):
         result = qmf.call("org.matahariproject.Test",
                           "/org/matahariproject/Test",
@@ -362,9 +319,22 @@ class DBusBridgeBasicApiTests(unittest.TestCase):
                 "/org/matahariproject/Test", "org.matahariproject.Test",
                 "multiplyString", [3, "abc", "bad"])
 
+    def test_object_wrongBusName(self):
+        self.assertRaises(QmfAgentException,
+            qmf.add_dbus_object, "org.matahariproject.Test.Bad",
+            "/org/matahariproject/Test")
+
+    def test_object_wrongObjectPath(self):
+        self.assertRaises(QmfAgentException,
+            qmf.add_dbus_object, "org.matahariproject.Test",
+            "/org/matahariproject/Test/Bad")
+
 
 
 class DBusBridgeAdvancedApiTests(unittest.TestCase):
+    """
+    Advanced tests for DBus Bridge. This tests will create permanent bridge.
+    """
     @classmethod
     def setUpClass(cls):
         qmf.add_dbus_object("org.matahariproject.Test", "/org/matahariproject/Test")
@@ -388,6 +358,16 @@ class DBusBridgeAdvancedApiTests(unittest.TestCase):
             time.sleep(1)
             loop_count = loop_count + 1
 
+    def test_object_call_wrongInterface(self):
+        self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
+
+        self.assertTrue(not "org.matahariproject.Test.Bad.testComplexArgs" in dir(qmf_dbus))
+
+    def test_object_call_wrongMethod(self):
+        self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
+
+        self.assertTrue(not "org.matahariproject.Test.badMethod" in dir(qmf_dbus))
+
     def test_object_call_testComplexArgs(self):
         self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
 
@@ -395,37 +375,39 @@ class DBusBridgeAdvancedApiTests(unittest.TestCase):
              [10, "test", ["a", "b", "c"], [[1, [2, 3]], [4, [5, 6, 7]]]]]
 
         result = qmf_dbus.__getattr__("org.matahariproject.Test.testComplexArgs")(s)
-        sys.stderr.write("Result: %s\n" % str(result))
+        self.assertEquals(result['1'], s, "Received array (%s) differs from excepted array (%s)" % (str(result), str(s)))
 
     def test_object_signal_simpleSignal(self):
         self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
-        print >>sys.stderr, "Waiting for signal"
+        print "Waiting for signal"
         qmf_dbus.__getattr__("org.matahariproject.Test.emit_simpleSignal")("test")
         time.sleep(2)
 
-        # Wait for event that correspond with the signal
+        # Wait for event that corresponds with the signal
         event = waitForSignal(connection.session)
         # Check is signal was received
         self.assertTrue(event is not None, "Signal has not been received")
         # Check signal data
-        self.assertEquals(event.getData(0).getProperty('s'), 'test', "Value obtained from signal doesn't match sended value")
+        self.assertEquals(event.getData(0).getProperty('s'), 'test', "Value obtained from signal doesn't match sent value")
 
     def test_object_signal_complexSignal(self):
         self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
-        print >>sys.stderr, "Waiting for signal"
+        print "Waiting for signal"
         # signature = "biudsaiasa(is)a{is}")
         args = (True, -42, 42, 3.14, "test", [1, 2, 3], ["h", "e", "ll", "o"], [[1, "a"], [2, "b"]], [[1, 'a'], [2, 'b'], [3, 'c']])
         qmf_dbus.__getattr__("org.matahariproject.Test.emit_complexSignal")(*args)
         time.sleep(2)
 
-        # Wait for event that correspond with the signal
+        # Wait for event that corresponds with the signal
         event = waitForSignal(connection.session)
         # Check is signal was received
         self.assertTrue(event is not None, "Signal has not been received")
         # Check signal data
+        data = event.getData(0)
         for i, name in enumerate(("b", "i", "u", "d", "s", "a_i", "a_s", "a_is", "d_is")):
-            self.assertEquals(event.getData(0).getProperty(name), args[i],
-                    "Value of argument '%s' obtained from signal (%s) doesn't match sent value (%s)" % (name, event.getData(0).getProperty(name), args[i]))
+            self.assertEquals(data.getProperty(name), args[i],
+                    "Value of argument '%s' obtained from signal (%s) doesn't match sent value (%s)" %
+                    (name, data.getProperty(name), args[i]))
 
 def waitForSignal(session):
     # Wait up to 10 seconds for signal

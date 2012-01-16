@@ -21,6 +21,9 @@
 
 #include "utils.h"
 
+/**
+ * DBusObject is internal representation of one DBus object.
+ */
 struct DBusObject {
     bool listenForSignals;
     string bus_name;
@@ -48,11 +51,27 @@ struct DBusObject {
      * Convert DBus object to QMF schema and add it to \p session
      *
      * \param[in] session QMF session
-     * \retval True addition succeeds
-     * \retval False error occured
+     * \param[out] error pointer to NULL if no error occurs, GError otherwise
      */
-    bool addToSchema(qmf::AgentSession &session);
+    void addToSchema(qmf::AgentSession &session, GError **error);
+
+    /**
+     * Get Interface by name
+     *
+     * \param[in] name name of the interface
+     * \return interface object or NULL when not found
+     */
     const Interface *getInterface(const string &name) const;
+
+    /**
+     * Method which is invoked when signal is received from registered
+     * dbus object. It converts arguments from DBus message to QMF event
+     * properties and then raises QMF event.
+     *
+     * \param[in] message DBusMessage that contains data from the signal
+     * \retval True Signal was successfully processed
+     * \retval False Processing of signal failed
+     */
     bool signalReceived(DBusMessage *message);
 };
 

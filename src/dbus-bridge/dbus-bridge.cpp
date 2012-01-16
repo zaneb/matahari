@@ -159,7 +159,10 @@ DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
                     session.raiseException(event, error->message);
                     return TRUE;
                 }
-                if (!dbusObject->addToSchema(session)) {
+
+                dbusObject->addToSchema(session, &error);
+                if (error) {
+                    session.raiseException(event, error->message);
                     return TRUE;
                 }
             } else {

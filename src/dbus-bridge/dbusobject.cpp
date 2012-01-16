@@ -91,6 +91,12 @@ DBusObject::DBusObject(DBusConnection *conn, const char *_bus_name,
             interfaces.push_back(interface);
         }
     }
+    if (interfaces.empty()) {
+        g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                    "No interface found on object '%s'. Is the path '%s' "
+                    "correct?", bus_name.c_str(), object_path.c_str());
+        mh_crit("%s", (*error)->message);
+    }
 
     xmlFreeDoc(doc);
     xmlCleanupParser();
@@ -109,8 +115,8 @@ DBusObject::~DBusObject()
     delete session;
 }
 
-bool
-DBusObject::addToSchema(qmf::AgentSession &_session)
+void
+DBusObject::addToSchema(qmf::AgentSession &_session, GError **error)
 {
     session = new qmf::AgentSession(_session);
     qmf::Schema schema(qmf::SCHEMA_TYPE_DATA, bus_name, object_path);
@@ -153,8 +159,11 @@ DBusObject::addToSchema(qmf::AgentSession &_session)
                 rule << "type='signal',interface='" << (*iface)->name << "'";
                 dbus_bus_add_match(connection, rule.str().c_str(), &err);
                 if (dbus_error_is_set(&err)) {
-                    mh_crit("Adding handler for receiving signals failed: %s", err.message);
-                    return false;
+                    g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                                "Adding handler for receiving signals failed: %s",
+                                err.message);
+                    mh_crit("%s", (*error)->message);
+                    return;
                 }
             }
         }
@@ -166,10 +175,10 @@ DBusObject::addToSchema(qmf::AgentSession &_session)
 
     // Register callback for incoming signals
     if (!dbus_connection_add_filter(connection, signalCallback, (void *) this, NULL)) {
-        mh_crit("Unable to register signal handler");
-        return false;
+        g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                    "Unable to register signal handler");
+        mh_crit("%s", (*error)->message);
     }
-    return true;
 }
 
 bool DBusObject::signalReceived(DBusMessage *message)
@@ -192,6 +201,7 @@ bool DBusObject::signalReceived(DBusMessage *message)
     qmf::Data event(*(signal->schema));
     int current_type;
 
+    // Convert DBus signal arguments to QMF event properties
     dbus_message_iter_init(message, &iter);
     list<Arg *>::const_iterator it, end = signal->args.end();
     for (it = signal->args.begin(); it != end; it++) {
@@ -204,12 +214,13 @@ bool DBusObject::signalReceived(DBusMessage *message)
         event.setProperty((*it)->name, v);
         dbus_message_iter_next(&iter);
     }
+    // Raise QMF event
     try {
         session->raiseEvent(event, qmf::SEV_CRIT);
     } catch (const qpid::messaging::ConnectionError& e) {
-        mh_log(LOG_ERR, "Connection error sending event to broker. (%s)", e.what());
+        mh_err("Connection error sending event to broker. (%s)", e.what());
     } catch (const qpid::types::Exception& e) {
-        mh_log(LOG_ERR, "Exception sending event to broker. (%s)", e.what());
+        mh_err("Exception sending event to broker. (%s)", e.what());
     }
     return true;
 }

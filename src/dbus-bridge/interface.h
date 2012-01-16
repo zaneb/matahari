@@ -21,6 +21,9 @@
 
 #include "utils.h"
 
+/**
+ * Internal representation of DBus interface.
+ */
 struct Interface {
     string name;
     list<Method *> methods;
@@ -28,9 +31,29 @@ struct Interface {
     list<Arg *> properties;
     const DBusObject *dbusObject;
 
+    /**
+     * Create Interace object from DBus introspection XML
+     *
+     * \param[in] node xmlNode with definition of interface
+     * \param[in] obj DBusObject that contains the interface
+     */
     Interface(xmlNode *node, const DBusObject *obj);
     virtual ~Interface();
+
+    /**
+     * Get method by name
+     *
+     * \param[in] name name of the method
+     * \return Method object or NULL when not found
+     */
     const Method *getMethod(const string &name) const;
+
+    /**
+     * Get signal by name
+     *
+     * \param[in] name name of the signal
+     * \return Signal object or NULL when not found
+     */
     const Signal *getSignal(const string &name) const;
 };
 

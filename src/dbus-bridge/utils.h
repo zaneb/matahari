@@ -79,22 +79,6 @@ matahari_error_quark(void);
 int
 dbus_type_to_qmf_type(int type);
 
-
-/**
- * Add \p value to DBus message.
- *
- * \param[in] iter iterator for arguments of DBus message
- * \param[in] value value to be added
- * \param[in] signature signature of the message
- *
- * \retval TRUE if adding argument succeeds
- * \retval FALSE otherwise
- */
-bool
-message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
-                const char *signature);
-
-
 /**
  * Get lenght of one item from DBus signature, one item means basic type,
  * array, struct or dict entry.
