@@ -177,16 +177,20 @@ class Manager(object):
         results = [None] * len(objs)
         seqs = []
         event = threading.Event()
+        seqlock = threading.Lock()
         def recv_response(seq, response):
-            i = seqs.index(seq)
-            results[i] = response
-            if None not in results:
-                event.set()
+            with seqlock:
+                i = seqs.index(seq)
+            if i >= 0:
+                results[i] = response
+                if None not in results:
+                    event.set()
         self._async.handle_method_responses(recv_response)
 
         for o in objs:
             m = getattr(o, method)
-            seqs.append(m(*args, _async=True, **kwargs))
+            with seqlock:
+                seqs.append(m(*args, _async=True, **kwargs))
         event.wait(TIMEOUT)
         return tuple(results)
 
