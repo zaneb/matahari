@@ -15,15 +15,42 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+
 import matahari.api
 import mode
 import interpreter
 
-class MatahariShell(object):
-    def __init__(self, prompt='mhsh'):
-        self.state = matahari.api.Matahari()
-        initial_mode = mode.RootMode(self.state)
-        self.interpreter = interpreter.Interpreter(prompt, initial_mode, debug=True)
 
-    def __call__(self):
-        self.interpreter.cmdloop()
+class MatahariShell(object):
+    """A Matahari Shell object, with its own API state."""
+
+    def __init__(self, connection=None, debug=False):
+        """
+        Initialise with optional connection parameters.
+        Specify debug=True to print all exceptions.
+        """
+        args = []
+        if connection is not None:
+            args.append(connection)
+        self.state = matahari.api.Matahari(*args)
+        initial_mode = mode.RootMode(self.state)
+        self.interpreter = interpreter.Interpreter('mhsh', initial_mode,
+                                                   debug=debug)
+
+    def __call__(self, *args):
+        """
+        Run the shell, either in interactive mode or executing the specified
+        scripts.
+        """
+        def getscript(arg):
+            if arg == '-':
+                import sys
+                return sys.stdin
+            return file(arg)
+
+        if args:
+            for arg in args:
+                with getscript(arg) as script:
+                    self.interpreter.runscript(script)
+        else:
+            self.interpreter.cmdloop()

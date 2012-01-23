@@ -22,6 +22,7 @@ The commands supported by the interpreter are supplied by the current mode,
 which can be changed by passing a new mode to the set_mode() method.
 """
 
+import sys
 import cmd
 
 import mode
@@ -85,7 +86,7 @@ class Interpreter(cmd.Cmd):
 
             if self.debug:
                 import traceback
-                self.stdout.write(traceback.format_exc())
+                sys.stderr.write(traceback.format_exc())
 
     def cmdloop(self, *args, **kwargs):
         while True:
@@ -133,10 +134,3 @@ class Interpreter(cmd.Cmd):
         return (filter(lambda n: n != 'do_EOF', cmd.Cmd.get_names(self)) +
                 ['%s_%s' % (p, c) for p in ['do', 'complete', 'help']
                                   for c in self.mode])
-
-
-if __name__ == '__main__':
-    mode = mode.Mode()
-    shell = Interpreter('mhsh', mode)
-    shell.cmdloop()
-

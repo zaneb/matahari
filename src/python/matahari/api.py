@@ -20,7 +20,7 @@ import core
 class BrokerConnection(object):
     def __init__(self, host='localhost', port=49000, ssl=False):
         self.host = host
-        self.port = 49000
+        self.port = port
         self.ssl = ssl
 
 class Proxy(object):
