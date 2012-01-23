@@ -460,7 +460,7 @@ mh_parse_options(const char *proc_name, int argc, char **argv, OptionsMap &optio
     mh_add_option('v', no_argument,       "verbose",                "Increase the log level", NULL, map_option);
 
     mh_add_option('u', required_argument, "username",  "username to use for authentication to the broker", &amqp_options, connection_option);
-    mh_add_option('P', required_argument, "password",  "username to use for authentication to the broker", &amqp_options, connection_option);
+    mh_add_option('P', required_argument, "password",  "password to use for authentication to the broker", &amqp_options, connection_option);
     mh_add_option('s', required_argument, "service",   "service name to use for authentication to the broker", &amqp_options, connection_option);
     mh_add_option('r', required_argument, "reconnect", "attempt to reconnect if the broker connection is lost", &amqp_options, connection_option);
 
