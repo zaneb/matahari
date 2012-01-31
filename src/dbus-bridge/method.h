@@ -29,7 +29,7 @@ struct Method {
     list<Arg *> inArgs;
     list<Arg *> outArgs;
     list<Arg *> allArgs;
-    const Interface *interface;
+    const DBusObject *dbusObject;
 
     /**
      * Create Method object from DBus introspection XML
@@ -37,12 +37,34 @@ struct Method {
      * \param[in] node xmlNode with definition of method
      * \param[in] iface DBus Interface that contains the method
      */
-    Method(xmlNode *node, const Interface *iface);
+    Method(xmlNode *node, const DBusObject *obj);
     virtual ~Method();
-    void addArg(Arg *arg);
-    list<qpid::types::Variant> argMapToList(const map<string, qpid::types::Variant> &m) const;
 
-    list<qpid::types::Variant> call(const list<qpid::types::Variant> &args, GError **err) const;
+    /**
+     * Add argument to the list of arguments
+     *
+     * \param[in] arg pointer to Arg object
+     */
+    void addArg(Arg *arg);
+
+    /**
+     * Convert argument map to list in correct order of arguments given by
+     * introspection.
+     *
+     * \param[in] m map with arguments
+     * \return list with arguments
+     */
+    qList argMapToList(const qMap &m) const;
+
+    /**
+     * Call method with given list of arguments
+     *
+     * \param[in] args list of arguments
+     * \param[out] err pointer to NULL if succeeds, pointer to error otherwise
+     *
+     * \return list with return arguments
+     */
+    qList call(const qList &args, GError **err) const;
 };
 
 /**
@@ -51,7 +73,7 @@ struct Method {
 struct Signal {
     string name;
     list<Arg *> args;
-    const Interface *interface;
+    const DBusObject *dbusObject;
     qmf::Schema *schema;
 
     /**
@@ -60,7 +82,7 @@ struct Signal {
      * \param[in] node xmlNode with definition of signal
      * \param[in] iface DBus Interface that contains the signal
      */
-    Signal(xmlNode *node, const Interface *iface);
+    Signal(xmlNode *node, const DBusObject *obj);
     virtual ~Signal();
 };
 
@@ -68,7 +90,7 @@ enum { DIR_IN, DIR_OUT };
 enum { ACCESS_READ_ONLY, ACCESS_READ_WRITE };
 
 /**
- * Internal representation of DBus argument.
+ * Internal representation of DBus argument or property.
  */
 struct Arg {
     string name;

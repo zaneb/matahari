@@ -19,7 +19,6 @@
 #include "method.h"
 
 #include "dbusobject.h"
-#include "interface.h"
 #include "utils.h"
 #include <qmf/SchemaProperty.h>
 #include <qmf/Schema.h>
@@ -29,7 +28,6 @@ extern "C" {
     #include "matahari/logging.h"
     #include "matahari/errors.h"
     #include <libxml/xpath.h>
-    #include <dbus/dbus.h>
 }
 
 /**
@@ -43,26 +41,26 @@ extern "C" {
  * \retval FALSE otherwise
  */
 bool
-message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
+message_add_arg(DBusMessageIter *iter, qVariant value,
                 const char *signature);
 
-Method::Method(xmlNode *node, const Interface *iface) : interface(iface)
+Method::Method(xmlNode *node, const DBusObject *obj) : dbusObject(obj)
 {
     xmlChar *nameStr;
-    char *method_name;
     xmlNodePtr subnode;
     nameStr = xmlGetProp(node, (const unsigned char *) "name");
-    name = (const char *) nameStr;
-    asprintf(&method_name, "%s.%s", interface->name.c_str(), name.c_str());
+    name = (char *) nameStr;
     int i = 0;
-    for (subnode = xmlFirstElementChild(node); subnode; subnode = subnode->next) {
+    for (subnode = xmlFirstElementChild(node);
+         subnode;
+         subnode = subnode->next) {
+
         if (xmlStrEqual(subnode->name, (const unsigned char *) "arg")) {
             addArg(new Arg(subnode, i));
             i++;
         }
     }
     xmlFree(nameStr);
-    free(method_name);
 }
 
 Method::~Method()
@@ -86,31 +84,32 @@ void Method::addArg(Arg *arg)
     allArgs.push_back(arg);
 }
 
-list<qpid::types::Variant>
-Method::argMapToList(const map<string, qpid::types::Variant> &m) const
+qList
+Method::argMapToList(const qMap &m) const
 {
-    list<qpid::types::Variant> l;
+    qList l;
     list<Arg *>::const_iterator it, end = inArgs.end();
-    qpid::types::Variant v;
+    qVariant v;
     for (it = inArgs.begin(); it != end; it++) {
         if ((*it)->name.size() > 0) {
             v = m.at((*it)->name);
         } else {
             mh_crit("Unknown argument");
-            v = qpid::types::Variant();
+            v = qVariant();
         }
         l.push_back(v);
     }
     return l;
 }
 
-list<qpid::types::Variant> Method::call(const list<qpid::types::Variant> &args, GError **err) const
+qList
+Method::call(const qList &args, GError **err) const
 {
     mh_debug("===== Method call =====\nBus name: %s\nObject path: %s\n"
              "Interface: %s\nMethod name: %s\n",
-             interface->dbusObject->bus_name.c_str(),
-             interface->dbusObject->object_path.c_str(),
-             interface->name.c_str(), name.c_str());
+             dbusObject->bus_name.c_str(),
+             dbusObject->object_path.c_str(),
+             dbusObject->interface.c_str(), name.c_str());
 
     DBusError dbusErr;
     DBusMessage *message, *reply;
@@ -121,26 +120,26 @@ list<qpid::types::Variant> Method::call(const list<qpid::types::Variant> &args, 
                     "Wrong number of arguments (expected: %lu, found: %lu)",
                     inArgs.size(), args.size());
         mh_crit("%s", (*err)->message);
-        return list<qpid::types::Variant>();
+        return qList();
     }
 
     // Create method call
-    message = dbus_message_new_method_call(interface->dbusObject->bus_name.c_str(),
-                                           interface->dbusObject->object_path.c_str(),
-                                           interface->name.c_str(),
+    message = dbus_message_new_method_call(dbusObject->bus_name.c_str(),
+                                           dbusObject->object_path.c_str(),
+                                           dbusObject->interface.c_str(),
                                            name.c_str());
     if (!message) {
         g_set_error(err, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
                     "Unable to create DBus message");
         mh_crit("%s", (*err)->message);
-        return list<qpid::types::Variant>();
+        return qList();
     }
 
     DBusMessageIter iter;
     dbus_message_iter_init_append(message, &iter);
 
     list<Arg *>::const_iterator arg, endArg = inArgs.end();
-    list<qpid::types::Variant>::const_iterator value, endValue = args.end();
+    qList::const_iterator value, endValue = args.end();
     for (arg = inArgs.begin(), value = args.begin();
          arg != endArg, value != endValue;
          arg++, value++) {
@@ -148,24 +147,26 @@ list<qpid::types::Variant> Method::call(const list<qpid::types::Variant> &args, 
         (*arg)->addToMessage(&iter, *value);
     }
 
-    // TODO: Async method call
     dbus_error_init (&dbusErr);
     // Call method
-    reply = dbus_connection_send_with_reply_and_block(interface->dbusObject->connection, message, CALL_TIMEOUT, &dbusErr);
+    reply = dbus_connection_send_with_reply_and_block(dbusObject->connection,
+                                                      message, CALL_TIMEOUT,
+                                                      &dbusErr);
 
     if (!reply) {
         g_set_error(err, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
                     "Unable to call DBus method: %s", dbusErr.message);
         mh_crit("%s", (*err)->message);
-        return list<qpid::types::Variant>();
+        return qList();
     }
 
     // Convert return arguments from reply message
     dbus_message_iter_init(reply, &iter);
     int current_type;
-    qpid::types::Variant::List list;
-    qpid::types::Variant v;
-    while ((current_type = dbus_message_iter_get_arg_type(&iter)) != DBUS_TYPE_INVALID) {
+    qList list;
+    qVariant v;
+    while ((current_type = dbus_message_iter_get_arg_type(&iter))
+            != DBUS_TYPE_INVALID) {
         v = dbus_message_iter_to_qpid_variant(current_type, &iter);
         mh_debug("Result: %s", v.asString().c_str());
         list.push_back(v);
@@ -179,23 +180,24 @@ list<qpid::types::Variant> Method::call(const list<qpid::types::Variant> &args, 
     return list;
 }
 
-Signal::Signal(xmlNode *node, const Interface *iface) : interface(iface), schema(NULL)
+Signal::Signal(xmlNode *node, const DBusObject *obj)
+: dbusObject(obj), schema(NULL)
 {
     xmlChar *nameStr;
-    char *signal_name;
     xmlNodePtr subnode;
     nameStr = xmlGetProp(node, (const unsigned char *) "name");
     name = (const char *) nameStr;
-    asprintf(&signal_name, "%s.%s", interface->name.c_str(), name.c_str());
     int i = 0;
-    for (subnode = xmlFirstElementChild(node); subnode; subnode = subnode->next) {
+    for (subnode = xmlFirstElementChild(node);
+         subnode;
+         subnode = subnode->next) {
+
         if (xmlStrEqual(subnode->name, (const unsigned char *) "arg")) {
             args.push_back(new Arg(subnode, i));
             i++;
         }
     }
     xmlFree(nameStr);
-    free(signal_name);
 }
 
 Signal::~Signal()
@@ -250,27 +252,28 @@ Arg::~Arg()
     free(type);
 }
 
-
 qmf::SchemaProperty Arg::toSchemaProperty() const
 {
     qmf::SchemaProperty prop(name, dbus_type_to_qmf_type(type[0]));
-    prop.setAccess(access == ACCESS_READ_ONLY ? qmf::ACCESS_READ_ONLY : qmf::ACCESS_READ_WRITE);
+    prop.setAccess(access == ACCESS_READ_ONLY ?
+                   qmf::ACCESS_READ_ONLY :
+                   qmf::ACCESS_READ_WRITE);
     prop.setDirection(dir == DIR_IN ? qmf::DIR_IN : qmf::DIR_OUT);
     return prop;
 }
 
-bool Arg::addToMessage(DBusMessageIter *iter, const qpid::types::Variant &v) const
+bool Arg::addToMessage(DBusMessageIter *iter, const qVariant &v) const
 {
     return message_add_arg(iter, v, type);
 }
 
 bool
-message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
+message_add_arg(DBusMessageIter *iter, qVariant value,
                 const char *signature)
 {
     int type = DBUS_TYPE_INVALID;
-    qpid::types::Variant::List::iterator it, end;
-    qpid::types::Variant::List list;
+    qList::iterator it, end;
+    qList list;
     char *subsignature = NULL;
     DBusMessageIter subiter;
     DBusBasicValue v;
@@ -292,7 +295,8 @@ message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
             subsignature = strdup(signature + 1);
             mh_debug("Array<%s>: %s", subsignature, value.asString().c_str());
 
-            if (!dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, subsignature, &subiter)) {
+            if (!dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
+                                                  subsignature, &subiter)) {
                 mh_crit("Unable to open message iter container");
                 return false;
             }
@@ -316,20 +320,23 @@ message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
             try {
                 list = value.asList();
             } catch (const qpid::types::InvalidConversion &err) {
-                mh_crit("Unable to convert value %s to list: %s", value.asString().c_str(), err.what());
+                mh_crit("Unable to convert value %s to list: %s",
+                        value.asString().c_str(), err.what());
                 return false;
             }
 
             start = 1;
             if (signature[0] == '(') {
                 mh_debug("Struct<%s>: %s", signature, value.asString().c_str());
-                if (!dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, NULL, &subiter)) {
+                if (!dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT,
+                                                      NULL, &subiter)) {
                     mh_crit("Unable to open message iter container");
                     return false;
                 }
             } else {
                 mh_debug("Dict<%s>: %s", signature, value.asString().c_str());
-                if (!dbus_message_iter_open_container(iter, DBUS_TYPE_DICT_ENTRY, NULL, &subiter)) {
+                if (!dbus_message_iter_open_container(iter,
+                        DBUS_TYPE_DICT_ENTRY, NULL, &subiter)) {
                     mh_crit("Unable to open message iter container");
                     return false;
                 }
@@ -359,7 +366,8 @@ message_add_arg(DBusMessageIter *iter, qpid::types::Variant value,
             char s[2];
             s[0] = type;
             s[1] = '\0';
-            dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, s, &subiter);
+            dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, s,
+                                             &subiter);
             dbus_message_iter_append_basic(&subiter, type, &v);
             dbus_message_iter_close_container(iter, &subiter);
             break;

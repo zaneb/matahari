@@ -34,6 +34,11 @@ namespace qpid {
         class Variant;
     }
 }
+
+#define qList std::list<qpid::types::Variant>
+#define qMap std::map<string, qpid::types::Variant>
+#define qVariant qpid::types::Variant
+
 namespace qmf {
     class AgentSession;
     class Schema;
@@ -69,6 +74,10 @@ matahari_error_quark(void);
 // Default timeout for all calls with timeout
 #define CALL_TIMEOUT 10000
 
+#define DBUS_INTROSPECTABLE "org.freedesktop.DBus.Introspectable"
+#define DBUS_INTROSPECT "Introspect"
+#define PROPERTIES_IFACE "org.freedesktop.DBus.Properties"
+
 /**
  * Convert DBus type to QMF type
  *
@@ -103,7 +112,7 @@ get_signature_item_length(const char *signature);
  * \return converted result
  */
 DBusBasicValue
-qpid_variant_to_dbus(const qpid::types::Variant &value, int *type, int expected_type);
+qpid_variant_to_dbus(const qVariant &value, int *type, int expected_type);
 
 
 /**
@@ -116,5 +125,18 @@ qpid_variant_to_dbus(const qpid::types::Variant &value, int *type, int expected_
  */
 qpid::types::Variant
 dbus_message_iter_to_qpid_variant(int type, DBusMessageIter *iter);
+
+/**
+ * Use DBus introspection to obtain XML with description of the object
+ *
+ * \param[in] conn Valid connection to DBus bus
+ * \param[in] bus_name Name of the object on bus
+ * \param[in] object_path Path of the object
+ * \param[out] error Pointer to null if succeeds, pointer to error otherwise
+ *
+ * \return DBus introspection XML, do not free
+ */
+const char *
+dbus_introspect(DBusConnection *conn, string bus_name, string object_path, GError **error);
 
 #endif

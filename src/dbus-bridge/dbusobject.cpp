@@ -33,50 +33,34 @@ extern "C" {
     #include <libxml/xpath.h>
 }
 
-#include "interface.h"
 #include "method.h"
-
-#define DBUS_INTROSPECTABLE "org.freedesktop.DBus.Introspectable"
-#define DBUS_INTROSPECT "Introspect"
 
 DBusHandlerResult
 signalCallback(DBusConnection *connection, DBusMessage *message,
                void *user_data);
 
 DBusObject::DBusObject(DBusConnection *conn, const char *_bus_name,
-                       const char *_object_path, bool _listenForSignals,
-                       GError **error)
-    : listenForSignals(_listenForSignals), bus_name(_bus_name),
-      object_path(_object_path), connection(conn), session(NULL)
+                       const char *_object_path, const char *_interface,
+                       bool _listenForSignals, GError **error)
+    : listenForSignals(_listenForSignals), session(NULL), connection(conn), bus_name(_bus_name),
+      object_path(_object_path), interface(_interface), isRegistered(false)
 {
     char *name;
-    xmlNodePtr root_element, node;
-    DBusError err;
-    DBusMessage *message, *reply;
-    char *xml = NULL;
-    Interface *interface;
+    xmlNodePtr root_element, node, subnode;
+    const char *xml = NULL;
+    bool interface_found = false;
 
-    // Call DBus introspection
-    dbus_error_init(&err);
-    message = dbus_message_new_method_call(bus_name.c_str(), object_path.c_str(),
-                                           DBUS_INTROSPECTABLE, DBUS_INTROSPECT);
-    reply = dbus_connection_send_with_reply_and_block(conn, message,
-                                                      CALL_TIMEOUT, &err);
-    if (!reply || dbus_error_is_set(&err)) {
+    xml = dbus_introspect(conn, bus_name, object_path, error);
+
+    if (*error) {
+        return;
+    } else if (xml == NULL) {
         g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
-                    "Unable to introspect: %s %s (%s)", bus_name.c_str(),
-                    object_path.c_str(), err.message);
-        mh_crit("%s", (*error)->message);
+                    "Introspection of object '%s' with path '%s' failed",
+                    _bus_name, _object_path);
         return;
     }
 
-    dbus_message_get_args(reply, &err, DBUS_TYPE_STRING, &xml, DBUS_TYPE_INVALID);
-    if (dbus_error_is_set(&err)) {
-        g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
-                    "Introspection failed: %s", err.message);
-        mh_crit("%s", (*error)->message);
-        return;
-    }
     asprintf(&name, "%s@%s", _bus_name, _object_path);
 
     // Parse the introspection
@@ -87,30 +71,59 @@ DBusObject::DBusObject(DBusConnection *conn, const char *_bus_name,
         if (node->type == XML_ELEMENT_NODE &&
                 xmlStrEqual(node->name, (const unsigned char *) "interface")) {
 
-            interface = new Interface(node, this);
-            interfaces.push_back(interface);
+            name = (char *) xmlGetProp(node, (const xmlChar *) "name");
+
+            if (strcmp(name, _interface) == 0) {
+                interface_found = true;
+                for (subnode = xmlFirstElementChild(node); subnode; subnode = subnode->next) {
+
+                    if (xmlStrEqual(subnode->name, (const xmlChar *) "method")) {
+                        // Method
+                        methods.push_back(new Method(subnode, this));
+                    } else if (xmlStrEqual(subnode->name, (const xmlChar *) "property")) {
+                        // Property
+                        properties.push_back(new Arg(subnode, 0));
+                    } else if (xmlStrEqual(subnode->name, (const xmlChar *) "signal")) {
+                        // Signal
+                        signals.push_back(new Signal(subnode, this));
+                    }
+                }
+                break;
+            }
         }
     }
-    if (interfaces.empty()) {
+    if (!interface_found) {
         g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
-                    "No interface found on object '%s'. Is the path '%s' "
-                    "correct?", bus_name.c_str(), object_path.c_str());
+                    "No such interface '%s' found on object '%s' with path '%s'",
+                    interface.c_str(), bus_name.c_str(), object_path.c_str());
         mh_crit("%s", (*error)->message);
     }
 
     xmlFreeDoc(doc);
     xmlCleanupParser();
-//     free(xml); // TODO: why it crashes?
     free(name);
 }
 
 DBusObject::~DBusObject()
 {
-    list<Interface *>::iterator it, end = interfaces.end();
-    for (it = interfaces.begin(); it != end; it++) {
-        delete *it;
+    list<Method *>::iterator itMethod, endMethod = methods.end();
+    list<Arg *>::iterator itArg, endArg = properties.end();
+    list<Signal *>::iterator itSignal, endSignal = signals.end();
+
+    for (itMethod = methods.begin(); itMethod != endMethod; itMethod++) {
+        delete *itMethod;
     }
-    interfaces.clear();
+    methods.clear();
+
+    for (itArg = properties.begin(); itArg != endArg; itArg++) {
+        delete *itArg;
+    }
+    properties.clear();
+
+    for (itSignal = signals.begin(); itSignal != endSignal; itSignal++) {
+        delete *itSignal;
+    }
+    signals.clear();
 
     delete session;
 }
@@ -118,60 +131,94 @@ DBusObject::~DBusObject()
 void
 DBusObject::addToSchema(qmf::AgentSession &_session, GError **error)
 {
+    if (isRegistered)
+        return;
+
+    mh_debug("Register: %s@%s, %s", bus_name.c_str(), object_path.c_str(), interface.c_str());
     session = new qmf::AgentSession(_session);
-    qmf::Schema schema(qmf::SCHEMA_TYPE_DATA, bus_name, object_path);
-    list<Interface *>::const_iterator iface, endIface = interfaces.end();
-    list<Method *>::const_iterator method, endMethod;
+    qmf::Schema schema(qmf::SCHEMA_TYPE_DATA, bus_name + "@" + object_path, interface);
+    list<Method *>::const_iterator method, endMethod = methods.end();
     list<Arg *>::const_iterator arg, endArg;
-    list<Signal *>::const_iterator signal, endSignal;
+    list<Signal *>::const_iterator signal, endSignal = signals.end();
 
-    for (iface = interfaces.begin(); iface != endIface; iface++) {
-        endMethod = (*iface)->methods.end();
-        for (method = (*iface)->methods.begin(); method != endMethod; method++) {
-            qmf::SchemaMethod schemaMethod((*iface)->name + "." + (*method)->name);
-            endArg = (*method)->allArgs.end();
-            for (arg = (*method)->allArgs.begin(); arg != endArg; arg++) {
-                schemaMethod.addArgument((*arg)->toSchemaProperty());
-            }
-            schema.addMethod(schemaMethod);
+    for (method = methods.begin(); method != endMethod; method++) {
+        qmf::SchemaMethod schemaMethod((*method)->name);
+        endArg = (*method)->allArgs.end();
+        for (arg = (*method)->allArgs.begin(); arg != endArg; arg++) {
+            schemaMethod.addArgument((*arg)->toSchemaProperty());
         }
-        endArg = (*iface)->properties.end();
-        for (arg = (*iface)->properties.begin(); arg != endArg; arg++) {
-            schema.addProperty((*arg)->toSchemaProperty());
+        schema.addMethod(schemaMethod);
+    }
+    // Add properties to schema
+    endArg = properties.end();
+    for (arg = properties.begin(); arg != endArg; arg++) {
+        schema.addProperty((*arg)->toSchemaProperty());
+    }
+
+    isRegistered = true;
+
+    if (listenForSignals) {
+        endSignal = signals.end();
+        for (signal = signals.begin(); signal != endSignal; signal++) {
+            (*signal)->schema = new qmf::Schema(qmf::SCHEMA_TYPE_EVENT, bus_name + "@" + object_path, interface + "." + (*signal)->name);
+            endArg = (*signal)->args.end();
+            for (arg = (*signal)->args.begin(); arg != endArg; arg++) {
+                (*signal)->schema->addProperty((*arg)->toSchemaProperty());
+            }
+            session->registerSchema(*((*signal)->schema));
         }
 
-        if (listenForSignals) {
-            endSignal = (*iface)->signals.end();
-            for (signal = (*iface)->signals.begin(); signal != endSignal; signal++) {
-                (*signal)->schema = new qmf::Schema(qmf::SCHEMA_TYPE_EVENT, bus_name + "@" + object_path, (*iface)->name + "." + (*signal)->name);
-                endArg = (*signal)->args.end();
-                for (arg = (*signal)->args.begin(); arg != endArg; arg++) {
-                    (*signal)->schema->addProperty((*arg)->toSchemaProperty());
-                }
-                session->registerSchema(*((*signal)->schema));
-            }
-
-            if ((*iface)->signals.size() > 0) {
-                // Register listening for signals
-                DBusError err;
-                dbus_error_init(&err);
-                stringstream rule;
-                rule << "type='signal',interface='" << (*iface)->name << "'";
-                dbus_bus_add_match(connection, rule.str().c_str(), &err);
-                if (dbus_error_is_set(&err)) {
-                    g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
-                                "Adding handler for receiving signals failed: %s",
-                                err.message);
-                    mh_crit("%s", (*error)->message);
-                    return;
-                }
+        if (signals.size() > 0) {
+            // Register listening for signals
+            DBusError err;
+            dbus_error_init(&err);
+            stringstream rule;
+            rule << "type='signal',interface='" << interface << "'";
+            dbus_bus_add_match(connection, rule.str().c_str(), &err);
+            if (dbus_error_is_set(&err)) {
+                g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                            "Adding handler for receiving signals failed: %s",
+                            err.message);
+                mh_crit("%s", (*error)->message);
+                return;
             }
         }
     }
     session->registerSchema(schema);
     qmf::Data data(schema);
-    string name = bus_name + "@" + object_path;
-    session->addData(data, name, false);
+    string name = bus_name + "@" + object_path + "@" + interface;
+
+    // Set values of the properties
+    if (properties.size() > 0) {
+        qList ifaces;
+        ifaces.push_back(interface);
+        qList ret = DBusObject::call(connection, bus_name.c_str(),
+                                      object_path.c_str(), PROPERTIES_IFACE,
+                                      "GetAll", ifaces, error);
+        if (*error != NULL) {
+            mh_warn("GetAll method failed (%s)", (*error)->message);
+        } else if (ret.size() < 1) {
+            mh_warn("GetAll method failed");
+        } else {
+            // First argument is list of properties
+            qList props = ret.front().asList();
+
+            qList::iterator it, end = props.end();
+            for (it = props.begin(); it != end; it++) {
+                // Each item is list of two items: name and value of the property
+                qList::iterator prop = (*it).asList().begin();
+                if (getProperty((*prop).asString()) != NULL) {
+                    mh_debug("Setting value of property: %s", (*prop).asString().c_str());
+                    string propName = (*prop).asString();
+                    prop++;
+                    data.setProperty(propName, *(prop));
+                } else {
+                    mh_warn("Unknown property: %s", (*prop).asString().c_str());
+                }
+            }
+        }
+    }
+    session->addData(data, name);
 
     // Register callback for incoming signals
     if (!dbus_connection_add_filter(connection, signalCallback, (void *) this, NULL)) {
@@ -181,15 +228,11 @@ DBusObject::addToSchema(qmf::AgentSession &_session, GError **error)
     }
 }
 
-bool DBusObject::signalReceived(DBusMessage *message)
+bool
+DBusObject::signalReceived(DBusMessage *message) const
 {
     // Find matching Signal object
-    const Interface *interface = getInterface(string(dbus_message_get_interface(message)));
-    if (!interface) {
-        mh_crit("No interface %s found\n", dbus_message_get_interface(message));
-        return false;
-    }
-    const Signal *signal = interface->getSignal(dbus_message_get_member(message));
+    const Signal *signal = getSignal(dbus_message_get_member(message));
     if (!signal) {
         mh_crit("No signal %s found on interface %s\n", dbus_message_get_member(message), dbus_message_get_interface(message));
         return false;
@@ -225,16 +268,140 @@ bool DBusObject::signalReceived(DBusMessage *message)
     return true;
 }
 
-const Interface *DBusObject::getInterface(const string &name) const
+const Method *
+DBusObject::getMethod(const string &_name) const
 {
-    list<Interface *>::const_iterator it, end = interfaces.end();
-    for (it = interfaces.begin(); it != end; it++) {
-        if ((*it)->name.compare(name) == 0) {
+    list<Method *>::const_iterator it, end = methods.end();
+    for (it = methods.begin(); it != end; it++) {
+        if ((*it)->name.compare(_name) == 0) {
             return *it;
         }
     }
     return NULL;
 }
+
+const Signal *
+DBusObject::getSignal(const string &_name) const
+{
+    list<Signal *>::const_iterator it, end = signals.end();
+    for (it = signals.begin(); it != end; it++) {
+        if ((*it)->name.compare(_name) == 0) {
+            return *it;
+        }
+    }
+    return NULL;
+}
+
+const Arg *
+DBusObject::getProperty(const string &_name) const
+{
+    list<Arg *>::const_iterator it, end = properties.end();
+    for (it = properties.begin(); it != end; it++) {
+        if ((*it)->name.compare(_name) == 0) {
+            return *it;
+        }
+    }
+    return NULL;
+}
+
+qList
+DBusObject::call(DBusConnection *conn,
+     const char *bus_name, const char *object_path, const char *interface,
+     const char *methodName, const qList &args, GError **err)
+{
+    DBusObject obj(conn, bus_name, object_path, interface, false, err);
+    if (*err) {
+        return qList();
+    }
+    const Method *method = obj.getMethod(methodName);
+    if (method == NULL) {
+        g_set_error(err, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                    "No such method '%s' found on object '%s' with path '%s' and interface '%s'",
+                    methodName, bus_name, object_path, interface);
+        return qList();
+
+    }
+    return method->call(args, err);
+}
+
+qList
+DBusObject::getObjectPaths(DBusConnection *conn, const string &bus_name,
+               const string &object_path)
+{
+    GError *error = NULL;
+    qList object_paths;
+
+    const char *xml = dbus_introspect(conn, bus_name, object_path, &error);
+
+    if (error)
+        return qList();
+
+    xmlInitParser();
+    xmlDocPtr doc = xmlReadMemory(xml, strlen(xml), "noname.xml", NULL, 0);
+    xmlNodePtr root_element = xmlDocGetRootElement(doc), node;
+    xmlChar *name;
+    string path;
+    bool hasContent = false;
+
+    for (node = xmlFirstElementChild(root_element); node; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (xmlStrEqual(node->name, (const unsigned char *) "node")) {
+                name = xmlGetProp(node, (const xmlChar *) "name");
+                if (object_path.size() > 1) {
+                    path = object_path + "/" + (char *) name;
+                } else {
+                    path = object_path + (char *) name;
+                }
+                qList paths = getObjectPaths(conn,
+                                                                  bus_name,
+                                                                  path);
+                object_paths.insert(object_paths.end(), paths.begin(),
+                                    paths.end());
+                xmlFree(name);
+            } else {
+                hasContent = true;
+            }
+        }
+    }
+    if (hasContent) {
+        object_paths.push_back(object_path);
+    }
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+
+    return object_paths;
+}
+
+qList
+DBusObject::getInterfaces(DBusConnection *conn, const string &bus_name,
+              const string &object_path)
+{
+    GError *error = NULL;
+    qList interfaces;
+    xmlChar *name;
+    const char *xml = dbus_introspect(conn, bus_name, object_path, &error);
+
+    if (error)
+        return qList();
+
+    xmlInitParser();
+    xmlDocPtr doc = xmlReadMemory(xml, strlen(xml), "noname.xml", NULL, 0);
+    xmlNodePtr root_element = xmlDocGetRootElement(doc), node;
+
+    for (node = xmlFirstElementChild(root_element); node; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (xmlStrEqual(node->name, (const unsigned char *) "interface")) {
+                name = xmlGetProp(node, (const xmlChar *) "name");
+                interfaces.push_back((char *) name);
+                xmlFree(name);
+            }
+        }
+    }
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+    return interfaces;
+}
+
 
 DBusHandlerResult
 signalCallback(DBusConnection *connection, DBusMessage *message, void *user_data)

@@ -19,8 +19,8 @@
 #include "utils.h"
 
 extern "C" {
-    #include <dbus/dbus.h>
     #include "matahari/logging.h"
+    #include "matahari/errors.h"
 }
 
 #include <qmf/SchemaTypes.h>
@@ -212,7 +212,7 @@ qpid::types::Variant
 dbus_message_iter_to_qpid_variant(int type, DBusMessageIter *iter)
 {
     DBusBasicValue v;
-    qpid::types::Variant::List l;
+    qList l;
     DBusMessageIter subiter;
     int subtype;
 
@@ -282,3 +282,36 @@ dbus_message_iter_to_qpid_variant(int type, DBusMessageIter *iter)
     }
     return qpid::types::Variant();
 }
+
+const char *
+dbus_introspect(DBusConnection *conn, string bus_name, string object_path, GError **error)
+{
+    const char *xml = NULL;
+    DBusError err;
+    DBusMessage *message, *reply;
+    // Call DBus introspection
+    dbus_error_init(&err);
+    message = dbus_message_new_method_call(bus_name.c_str(), object_path.c_str(),
+                                           DBUS_INTROSPECTABLE, DBUS_INTROSPECT);
+    reply = dbus_connection_send_with_reply_and_block(conn, message,
+                                                      CALL_TIMEOUT, &err);
+    if (!reply || dbus_error_is_set(&err)) {
+        g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                    "Unable to introspect: %s %s (%s)", bus_name.c_str(),
+                    object_path.c_str(), err.message);
+        mh_crit("%s", (*error)->message);
+        return NULL;
+    }
+
+    dbus_message_get_args(reply, &err, DBUS_TYPE_STRING, &xml, DBUS_TYPE_INVALID);
+    if (dbus_error_is_set(&err)) {
+        g_set_error(error, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+                    "Introspection failed: %s", err.message);
+        mh_crit("%s", (*error)->message);
+        return NULL;
+    }
+    dbus_message_unref(message);
+    dbus_message_unref(reply);
+    return xml;
+}
+

@@ -1,22 +1,54 @@
 <schema package="org.matahariproject">
 
     <class name="DBusBridge">
-        <property name="hostname" type="sstr" access="RO" desc="Hostname" index="y" />
-        <property name="uuid"     type="sstr" access="RO" desc="Host UUID" index="y" />
+        <property name="hostname"    type="sstr"  access="RO" desc="Hostname"  index="y" />
+        <property name="uuid"        type="sstr"  access="RO" desc="Host UUID" index="y" />
 
-        <method name="call">
-            <arg name="bus_name"    type="sstr" dir="I" />
-            <arg name="object_path" type="sstr" dir="I" />
-            <arg name="interface"   type="sstr" dir="I" />
-            <arg name="method_name" type="sstr" dir="I" />
-            <arg name="args"        type="list" dir="I" />
-            <arg name="results"     type="list" dir="O" />
+        <method name="call" desc="Call method of DBus object">
+            <arg name="bus_name"     type="sstr"  dir="I" />
+            <arg name="object_path"  type="sstr"  dir="I" />
+            <arg name="interface"    type="sstr"  dir="I" />
+            <arg name="method_name"  type="sstr"  dir="I" />
+            <arg name="args"         type="list"  dir="I" />
+            <arg name="results"      type="list"  dir="O" />
         </method>
 
-        <method name="add_dbus_object">
-            <arg name="bus_name"    type="sstr" dir="I" />
-            <arg name="object_path" type="sstr" dir="I" />
-            <arg name="result"      type="int64"  dir="O" />
+        <method name="list_dbus_objects" desc="Get the list of all dbus objects, both running and activatable">
+            <!-- TODO: Filter ? -->
+            <arg name="only_well_known" type="bool" dir="I" />
+            <arg name="dbus_objects" type="list"  dir="O" />
+        </method>
+
+        <method name="list_object_paths" desc="Get the list of all object paths for given bus name">
+            <arg name="bus_name"     type="sstr"  dir="I" />
+            <arg name="object_paths" type="list"  dir="O" />
+        </method>
+
+        <method name="list_interfaces" desc="Get the list of interfaces on given dbus object">
+            <arg name="bus_name"     type="sstr"  dir="I" />
+            <arg name="object_path"  type="sstr"  dir="I" />
+            <arg name="interfaces"   type="list"  dir="O" />
+        </method>
+
+        <!--
+        <para>
+            Create DBus bridge for given <literal>bus_name</literal>,
+            <literal>object_path</literal> and <literal>interface</literal>
+            (or all interfaces if not given).
+        </para>
+        <para>
+            New QMF object will be created with Package name in the form
+            <literal>bus_name@object_path</literal> and class name
+            <literal>interface</literal>. Furthermore, for each signal there
+            will be a new QMF event in the same package created with class
+            <literal>interface.signal_name</literal>.
+        </para>
+        -->
+        <method name="add_dbus_object" desc="Create DBus bridge">
+            <arg name="bus_name"     type="sstr"  dir="I" />
+            <arg name="object_path"  type="sstr"  dir="I" />
+            <arg name="interface"    type="sstr"  dir="I" default="" />
+            <arg name="result"       type="int64" dir="O" />
         </method>
     </class>
 </schema>
