@@ -286,7 +286,8 @@ run_puppet(const char *uri, int oneoff, const char *data, const char *key,
     action->id = strdup("puppet");
 
     for (i = 0, written = 0; args[i] != NULL; i++) {
-        written += snprintf(buf + written, sizeof(buf),"%s%s", i ? " " : "", args[i]);
+        written += snprintf(buf + written, sizeof(buf) - written,
+                            "%s%s", i ? " " : "", args[i]);
     }
     mh_info("Running puppet with args: %s", buf);
 
