@@ -131,7 +131,9 @@ action_cb(svc_action_t *action)
 
     action_data->result_cb(action_data->cb_data, action->rc);
 
-    unlink(action_data->filename);
+    if (action_data->filename) {
+        unlink(action_data->filename);
+    }
 
     action_data_free(action_data);
     action->cb_data = NULL;
@@ -194,21 +196,33 @@ return_cleanup:
 }
 
 static enum mh_result
-run_puppet(const char *uri, const char *data, const char *key,
+run_puppet(const char *uri, int oneoff, const char *data, const char *key,
            mh_sysconfig_result_cb result_cb, void *cb_data)
 {
-    const char *args[3];
-    char filename[PATH_MAX];
+    int i;
+    int written;
+    char buf[128];
+    const char *args[5];
+    char filename[PATH_MAX] = "";
     svc_action_t *action = NULL;
     struct action_data *action_data = NULL;
     int use_apply = 0;
     enum mh_result res = MH_RES_SUCCESS;
+    char *domain = NULL;
 
     if (check_puppet(&use_apply)) {
         return MH_RES_BACKEND_ERROR;
     }
 
-    if (uri) {
+    if (uri && !strncasecmp(uri, "puppet://", 9)) {
+        if (!(domain = strstr(uri, "//")) || strlen(domain) < 3) {
+            return MH_RES_INVALID_ARGS;
+        }
+        domain += 2;
+        if (strstr(domain, "/")) {
+            return MH_RES_INVALID_ARGS;
+        }
+    } else if (uri) {
         int fd;
         FILE *fp;
 
@@ -240,13 +254,21 @@ run_puppet(const char *uri, const char *data, const char *key,
         return MH_RES_INVALID_ARGS;
     }
 
-    if (use_apply) {
-        args[0] = "apply";
-        args[1] = filename;
-        args[2] = NULL;
+    if (!mh_strlen_zero(filename)) {
+        if (use_apply) {
+            args[0] = "apply";
+            args[1] = filename;
+            args[2] = NULL;
+        } else {
+            args[0] = filename;
+            args[1] = NULL;
+        }
     } else {
-        args[0] = filename;
-        args[1] = NULL;
+        args[0] = "agent";
+        args[1] = "--server";
+        args[2] = domain;
+        args[3] = oneoff ? "--test" : NULL;
+        args[4] = NULL;
     }
 
     if (!(action = mh_services_action_create_generic("puppet", args))) {
@@ -256,14 +278,17 @@ run_puppet(const char *uri, const char *data, const char *key,
 
     action_data = calloc(1, sizeof(*action_data));
     action_data->key = strdup(key);
-    action_data->filename = strdup(filename);
+    action_data->filename = !mh_strlen_zero(filename) ? strdup(filename) : NULL;
     action_data->result_cb = result_cb;
     action_data->cb_data = cb_data;
 
     action->cb_data = action_data;
     action->id = strdup("puppet");
 
-    mh_info("Running puppet %s%s", use_apply ? "apply " : "", filename);
+    for (i = 0, written = 0; args[i] != NULL; i++) {
+        written += snprintf(buf + written, sizeof(buf),"%s%s", i ? " " : "", args[i]);
+    }
+    mh_info("Running puppet with args: %s", buf);
 
     if (services_action_async(action, action_cb) == FALSE) {
         res = MH_RES_BACKEND_ERROR;
@@ -439,7 +464,7 @@ sysconfig_os_run_uri(const char *uri, uint32_t flags, const char *scheme,
     }
 
     if (strcasecmp(scheme, "puppet") == 0) {
-        rc = run_puppet(uri, NULL, key, result_cb, cb_data);
+        rc = run_puppet(uri, 1, NULL, key, result_cb, cb_data);
     } else if (strcasecmp(scheme, "augeas") == 0) {
         rc = run_augeas(uri, NULL, key, result_cb, cb_data);
     } else {
@@ -464,7 +489,7 @@ sysconfig_os_run_string(const char *string, uint32_t flags, const char *scheme,
     }
 
     if (!strcasecmp(scheme, "puppet")) {
-        rc = run_puppet(NULL, string, key, result_cb, cb_data);
+        rc = run_puppet(NULL, 0, string, key, result_cb, cb_data);
     } else if (strcasecmp(scheme, "augeas") == 0) {
         rc = run_augeas(NULL, string, key, result_cb, cb_data);
     } else {
