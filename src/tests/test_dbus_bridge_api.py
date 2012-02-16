@@ -552,6 +552,20 @@ class DBusBridgePermanentBridgeTests(unittest.TestCase):
         prop2 = qmf_dbus.prop2
         self.assertEquals(prop2, "aaa", "Value of property 'prop2' (%s) differs from expected (%s)" % (prop2, "aaa"))
 
+    def test_object_set_properties(self):
+        self.assertTrue(qmf_dbus is not None, "Bridged DBus object hasn't been created")
+        qmf_dbus.Set({"prop1": 456})
+        qmf_dbus.Set({"prop2": "bbb"})
+
+        props = qmf_dbus.Get()['values']
+        prop1 = props["prop1"]
+        prop2 = props["prop2"]
+        self.assertEquals(prop1, 456, "Value of property 'prop1' (%d) differs from expected (%d)" % (prop1, 456))
+        self.assertEquals(prop2, "bbb", "Value of property 'prop2' (%s) differs from expected (%s)" % (prop2, "bbb"))
+
+        # Set not existring property
+        self.assertRaises(QmfAgentException, qmf_dbus.Set, {"wrong": 123})
+
 def waitForSignal(session):
     # Wait up to 10 seconds for signal
     event = cqmf2.ConsoleEvent()

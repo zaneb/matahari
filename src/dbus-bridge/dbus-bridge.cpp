@@ -32,6 +32,8 @@ extern "C" {
     #include <dbus/dbus-glib-lowlevel.h>
 }
 
+typedef map<string, DBusObject *> DBusObjectMap;
+
 class DBusAgent : public MatahariAgent
 {
 public:
@@ -50,14 +52,14 @@ private:
                                     const char *object_path,
                                     const char *interface,
                                     bool listenToSignals, GError **error);
-    map<string, DBusObject *> dbus_objects;
+    DBusObjectMap dbus_objects;
 };
 
 const char DBusAgent::DBUS_BRIDGE_NAME[] = "DBusBridge";
 
 DBusAgent::~DBusAgent()
 {
-    map<string, DBusObject *>::iterator it, end = dbus_objects.end();
+    DBusObjectMap::iterator it, end = dbus_objects.end();
     for (it = dbus_objects.begin(); it != end; it++) {
         delete it->second;
     }
@@ -96,7 +98,7 @@ DBusAgent::getDBusObject(const char *bus_name, const char *object_path,
     string name(string(bus_name) + "@" + object_path + "@" + interface);
 
     DBusObject *obj;
-    map<string, DBusObject *>::const_iterator it;
+    DBusObjectMap::const_iterator it;
     it = dbus_objects.find(name);
     if (it == dbus_objects.end()) {
         obj = new DBusObject(conn, bus_name, object_path, interface,
@@ -127,15 +129,13 @@ blacklisted_interfaces(const string &interface)
 
 // We need function for comparing strings in qpid::types::Variants and
 // it has to be in the same namespace as the class
-namespace qpid {
-    namespace types {
-        bool
-        operator<(const qVariant &v1, const qVariant &v2)
-        {
-            return v1.asString().compare(v2.asString()) < 0;
-        }
+struct VariantComparator {
+    bool operator()(const qVariant &v1, const qVariant &v2)
+    {
+        return v1.asString().compare(v2.asString()) < 0;
     }
-}
+};
+
 
 gboolean
 DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
@@ -218,7 +218,7 @@ DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
 
             // Merge and sort results of ListNames and ListActivatableNames
             // (remove duplicates too)
-            set<qVariant> s(names.begin(), names.end());
+            set<qVariant, VariantComparator> s(names.begin(), names.end());
             s.insert(results.front().asList().begin(), results.front().asList().end());
             names.assign(s.begin(), s.end());
 
@@ -278,7 +278,7 @@ DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
         } else {
             session.raiseException(event,
                                    mh_result_to_str(MH_RES_NOT_IMPLEMENTED));
-            goto bail;
+            return TRUE;
         }
     } else {
 
@@ -326,6 +326,28 @@ DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
             return TRUE;
         }
 
+        // Handle property getter and setter
+        if (methodName == "Set") {
+            dbusObject->setPropertyValues(args["values"].asMap(), &error);
+            if (error) {
+                session.raiseException(event, error->message);
+                g_error_free(error);
+            } else {
+                session.methodSuccess(event);
+            }
+            return TRUE;
+        } else if (methodName == "Get") {
+            qMap props = dbusObject->getPropertyValues(&error);
+            if (error) {
+                session.raiseException(event, error->message);
+                g_error_free(error);
+            } else {
+                event.addReturnArgument("values", props);
+                session.methodSuccess(event);
+            }
+            return TRUE;
+        }
+
         method = dbusObject->getMethod(methodName);
         if (!method) {
             session.raiseException(event, "Unknown method " + methodName +
@@ -366,8 +388,6 @@ DBusAgent::invoke(qmf::AgentSession session, qmf::AgentEvent event,
     }
 
     session.methodSuccess(event);
-
-bail:
     return TRUE;
 }
 

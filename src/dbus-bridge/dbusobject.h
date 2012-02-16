@@ -101,6 +101,22 @@ public:
      */
     const Arg *getProperty(const string &name) const;
 
+    /**
+     * Set values for the DBus object properties
+     *
+     * \param[in] values map with properties to be set
+     * \param[out] error pointer to NULL if no error occurs, GError otherwise
+     */
+    void setPropertyValues(const qMap &values, GError **err) const;
+
+    /**
+     * Get values of the DBus object properties
+     *
+     * \param[out] error pointer to NULL if no error occurs, GError otherwise
+     * \return map with values of the properties
+     */
+    qMap getPropertyValues(GError **err) const;
+
 
     // Static methods
 

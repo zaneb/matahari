@@ -265,6 +265,8 @@ dbus_message_iter_to_qpid_variant(int type, DBusMessageIter *iter)
         case DBUS_TYPE_ARRAY:
         case DBUS_TYPE_STRUCT:
         case DBUS_TYPE_DICT_ENTRY:
+            // Dict entry has to be encoded to list of tuples, because qList has
+            // always STRING type of key and DBus can have any type as key
             dbus_message_iter_recurse(iter, &subiter);
             while ((subtype = dbus_message_iter_get_arg_type (&subiter)) != DBUS_TYPE_INVALID) {
                 l.push_back(dbus_message_iter_to_qpid_variant(subtype, &subiter));

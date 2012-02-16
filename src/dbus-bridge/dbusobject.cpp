@@ -150,9 +150,27 @@ DBusObject::addToSchema(qmf::AgentSession &_session, GError **error)
         schema.addMethod(schemaMethod);
     }
     // Add properties to schema
+    bool writableProperties = false;
     endArg = properties.end();
     for (arg = properties.begin(); arg != endArg; arg++) {
         schema.addProperty((*arg)->toSchemaProperty());
+        if ((*arg)->access == ACCESS_READ_WRITE) {
+            writableProperties = true;
+        }
+    }
+
+    // add getter function
+    qmf::SchemaMethod getterMethod("Get");
+    qmf::SchemaProperty valuesProp("values", qmf::SCHEMA_DATA_MAP);
+    valuesProp.setDirection(qmf::DIR_OUT);
+    getterMethod.addArgument(valuesProp);
+    schema.addMethod(getterMethod);
+
+    // add setter function if some properties are writable
+    if (writableProperties) {
+        qmf::SchemaMethod setterMethod("Set");
+        setterMethod.addArgument(qmf::SchemaProperty("values", qmf::SCHEMA_DATA_MAP));
+        schema.addMethod(setterMethod);
     }
 
     isRegistered = true;
@@ -302,6 +320,59 @@ DBusObject::getProperty(const string &_name) const
         }
     }
     return NULL;
+}
+
+void
+DBusObject::setPropertyValues(const qMap &values, GError **err) const
+{
+    qMap::const_iterator it, end = values.end();
+    for (it = values.begin(); it != end; it++) {
+        if (!getProperty(it->first)) {
+            g_set_error(err, MATAHARI_ERROR, MH_RES_INVALID_ARGS,
+                        "No such property '%s' on interface '%s'",
+                        it->first.c_str(), interface.c_str());
+            return;
+        }
+        qList args;
+        args.push_back(interface);
+        args.push_back(it->first);
+        args.push_back(it->second);
+        DBusObject::call(connection, bus_name.c_str(), object_path.c_str(),
+                        "org.freedesktop.DBus.Properties", "Set", args, err);
+        if (*err) {
+            return;
+        }
+    }
+}
+
+qMap
+DBusObject::getPropertyValues(GError **err) const
+{
+    qList args;
+    args.push_back(interface);
+    qList results = DBusObject::call(connection, bus_name.c_str(),
+                                     object_path.c_str(),
+                                     "org.freedesktop.DBus.Properties",
+                                     "GetAll", args, err);
+    if (*err) {
+        return qMap();
+    }
+    if (results.size() < 1) {
+        g_set_error(err, MATAHARI_ERROR, MH_RES_BACKEND_ERROR,
+            "Unable to get properties on interface '%s'", interface.c_str());
+        return qMap();
+    }
+    // Convert list of tuples to qMap
+    qMap map;
+    qList::iterator it, end = results.front().asList().end(), subit;
+    for (it = results.front().asList().begin(); it != end; it++) {
+        subit = it->asList().begin();
+        string key = subit->asString();
+        subit++;
+        qVariant value = *subit;
+        map.insert(pair<std::string, qVariant>(key, value));
+    }
+    return map;
 }
 
 qList

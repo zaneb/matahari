@@ -39,9 +39,31 @@
         <para>
             New QMF object will be created with Package name in the form
             <literal>bus_name@object_path</literal> and class name
-            <literal>interface</literal>. Furthermore, for each signal there
-            will be a new QMF event in the same package created with class
+            <literal>interface</literal>. It will have same methods as the
+            interface. Furthermore, for each signal there will be a new QMF
+            event created in the same package with name
             <literal>interface.signal_name</literal>.
+        </para>
+        <para>
+            DBus dictionary type differs from QMF map, because it can have
+            any basic type as key and QMF needs a string. For this reason, DBus
+            dictionaries are converted to list of tuples in QMF.
+        </para>
+        <para>
+            There are two methods for setting and getting properties:
+        </para>
+        <para>
+            <literal>Get() -> dict</literal> returns dict with all properties and their
+            values.
+        </para>
+        <para>
+            <literal>Set(dict)</literal> allows to set values of the properties
+            from dict. Setting non-existing property will cause error.
+        </para>
+        <para>
+            You can also get values of the properties using properties of QMF
+            object but they are set during object creation and are not changed
+            when DBus properties are changed.
         </para>
         -->
         <method name="add_dbus_object" desc="Create DBus bridge">
