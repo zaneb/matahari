@@ -11,6 +11,7 @@
 #cmakedefine HAVE_AUGEAS 1
 
 #define LOCAL_STATE_DIR "@localstatedir@"
+#define LIB_DIR         "@LIB_INSTALL_DIR@"
 
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE

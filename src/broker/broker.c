@@ -85,6 +85,9 @@ static char **broker_args(int argc, char * const argv[])
     APPEND_ARG(newargs, o, portarg);
     APPEND_ARG(newargs, o, "--data-dir=" LOCAL_STATE_DIR "/lib/matahari");
 
+    APPEND_ARG(newargs, o, "--no-module-dir");
+    APPEND_ARG(newargs, o, "--load-module=" LIB_DIR "/qpid/daemon/ssl.so");
+
     while (i < argc) {
         APPEND_ARG(newargs, o, argv[i++]);
     }
