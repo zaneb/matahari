@@ -317,7 +317,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-host
 %endif
-/sbin/service matahari-host condrestart
 
 %preun host
 if [ $1 = 0 ]; then
@@ -340,7 +339,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-network
 %endif
-/sbin/service matahari-network condrestart
 
 %preun network
 if [ $1 = 0 ]; then
@@ -363,7 +361,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-rpc
 %endif
-/sbin/service matahari-rpc condrestart
 
 %preun rpc
 if [ $1 = 0 ]; then
@@ -386,7 +383,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-service
 %endif
-/sbin/service matahari-service condrestart
 
 %preun service
 if [ $1 = 0 ]; then
@@ -409,7 +405,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-sysconfig
 %endif
-/sbin/service matahari-sysconfig condrestart
 
 %preun sysconfig
 if [ $1 = 0 ]; then
@@ -432,7 +427,6 @@ systemctl --system daemon-reload
 %else
 /sbin/chkconfig --add matahari-broker
 %endif
-/sbin/service matahari-broker condrestart
 
 %preun broker
 if [ $1 = 0 ]; then
@@ -452,7 +446,6 @@ fi
 %if %{systemd}
 systemctl --system daemon-reload
 %endif
-/sbin/service matahari-vios-proxy-host condrestart
 
 %preun vios-proxy-host
 if [ $1 = 0 ]; then
@@ -472,7 +465,6 @@ fi
 %if %{systemd}
 systemctl --system daemon-reload
 %endif
-/sbin/service matahari-vios-proxy-guest condrestart
 
 %preun vios-proxy-guest
 if [ $1 = 0 ]; then
