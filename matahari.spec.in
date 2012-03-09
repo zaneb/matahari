@@ -100,6 +100,7 @@ License:        GPLv2+
 Summary:        Optional AMQP Broker for Matahari
 Group:          Applications/System
 Requires:       %{name}-core = %{version}-%{release}
+Requires:       %{name}-lib = %{version}-%{release}
 Requires:       qpid-cpp-server > 0.7
 Requires:       qpid-cpp-server-ssl > 0.7
 Requires:       qmf > 0.7
