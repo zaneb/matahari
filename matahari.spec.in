@@ -90,6 +90,7 @@ as a set of objects with properties and methods.
 License:        GPLv2+
 Summary:        Core files for Matahari
 Group:          Applications/System
+Requires(pre):  shadow-utils
 
 %description core
 Core files for Matahari
@@ -154,7 +155,6 @@ Summary:        C++ library used by Matahari agents
 Group:          Applications/System
 Requires:       %{name}-lib = %{version}-%{release}
 Requires:       qpid-cpp-client-ssl > 0.7
-Requires(pre):  shadow-utils
 Requires:       kstart
 
 %description agent-lib
