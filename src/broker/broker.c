@@ -70,7 +70,7 @@ static char **broker_args(int argc, char * const argv[])
 {
     int i = 0, o = 0;
     char portarg[13];
-    char **newargs = malloc(sizeof(char *) * (argc + 2 + 1));
+    char **newargs = malloc(sizeof(char *) * (argc + 4 + 1));
 
     if (!newargs) {
         mh_err("Failed to allocate argument list");
