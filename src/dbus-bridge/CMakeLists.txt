@@ -11,7 +11,8 @@ if(WITH-QMF AND WITH-DBUS)
     add_executable(${QMF_AGENT} ${BASE}.cpp dbusobject.cpp method.cpp utils.cpp ${SCHEMA_SOURCES})
     target_link_libraries(${QMF_AGENT} mcommon mcommon_qmf ${dbus-glib_LIBRARIES} ${libxml2_LIBRARIES})
 
-    create_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION} ${AGENT_MAN_DESC})
+    #create_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION} ${AGENT_MAN_DESC})
+    install_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION})
     create_service_scripts(${BASE})
 
     install(TARGETS ${QMF_AGENT} DESTINATION sbin)

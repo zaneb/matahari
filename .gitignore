@@ -17,5 +17,6 @@ mock
 *.orig
 *.rej
 *.rpm
+*.swp
 tags
 TAGS

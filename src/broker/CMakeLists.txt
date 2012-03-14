@@ -12,12 +12,13 @@ if(NOT WIN32)
     install(TARGETS ${BROKER_DAEMON} DESTINATION sbin)
 
 
-    SET(MAN_PAGE ${BROKER_DAEMON}.${AGENT_MAN_SECTION})
-    install(CODE "execute_process(COMMAND gzip
-        INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${MAN_PAGE}
-        OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${MAN_PAGE}.gz)")
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${MAN_PAGE}.gz
-        DESTINATION share/man/man${AGENT_MAN_SECTION})
+    #SET(MAN_PAGE ${BROKER_DAEMON}.${AGENT_MAN_SECTION})
+    #install(CODE "execute_process(COMMAND gzip
+    #    INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${MAN_PAGE}
+    #    OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${MAN_PAGE}.gz)")
+    #install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${MAN_PAGE}.gz
+    #    DESTINATION share/man/man${AGENT_MAN_SECTION})
+    install_manpage(${BROKER_DAEMON} ${AGENT_MAN_SECTION})
 
     configure_file(${CMAKE_SOURCE_DIR}/sys/matahari-broker.init.in
                    ${CMAKE_CURRENT_BINARY_DIR}/matahari-broker.init @ONLY)

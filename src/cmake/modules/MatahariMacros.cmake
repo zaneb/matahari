@@ -119,6 +119,20 @@ macro(create_manpage BINARY SECTION DESC)
     endif(NOT WIN32)
 endmacro(create_manpage)
 
+macro(install_manpage BINARY SECTION)
+    SET(MAN_PAGE_IN ${CMAKE_CURRENT_SOURCE_DIR}/${BINARY}.${SECTION})
+    SET(MAN_PAGE_OUT ${CMAKE_CURRENT_BINARY_DIR}/${BINARY}.${SECTION}.gz)
+
+    if(NOT EXISTS ${MAN_PAGE_OUT})
+        execute_process(COMMAND gzip INPUT_FILE ${MAN_PAGE_IN} OUTPUT_FILE ${MAN_PAGE_OUT})
+        Message("Prepared ${BINARY} man page")
+    endif(NOT EXISTS ${MAN_PAGE_OUT})
+
+    if(NOT WIN32)
+        install(FILES ${MAN_PAGE_OUT} DESTINATION share/man/man${SECTION})
+    endif(NOT WIN32)
+endmacro(install_manpage)
+
 macro(create_service_scripts BASE)
     if(NOT WIN32)
         configure_file(${CMAKE_SOURCE_DIR}/sys/matahari.init.in ${CMAKE_CURRENT_BINARY_DIR}/matahari-${BASE})

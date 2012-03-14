@@ -4,6 +4,7 @@ config.h
 include/matahari.h
 qmf
 matahari-*
+!matahari-*.8
 *-dbus-glue.h
 *-dbus-properties.h
 org.matahariproject.xml

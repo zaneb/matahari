@@ -16,8 +16,10 @@ if(WITH-QMF)
     target_link_libraries(${QMF_AGENT} ${BASE_LIB} mcommon_qmf)
     target_link_libraries(${QMF_CONSOLE} mcommon_qmf)
 
-    create_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION} ${AGENT_MAN_DESC})
-    create_manpage(${QMF_CONSOLE} ${CONSOLE_MAN_SECTION} ${CONSOLE_MAN_DESC})
+    #create_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION} ${AGENT_MAN_DESC})
+    #create_manpage(${QMF_CONSOLE} ${CONSOLE_MAN_SECTION} ${CONSOLE_MAN_DESC})
+    install_manpage(${QMF_AGENT} ${AGENT_MAN_SECTION})
+    install_manpage(${QMF_CONSOLE} ${CONSOLE_MAN_SECTION})
     create_service_scripts(${BASE})
 
     set(BASE_SUB "-console")
