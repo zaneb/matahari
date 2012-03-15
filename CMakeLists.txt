@@ -30,6 +30,7 @@ inherit_value(QPID_PATH "C:/Program Files/Apache/qpid-0.6")
 inherit_value(localstatedir "/var")
 inherit_value(sysconfdir    "${SYSCONF_INSTALL_DIR}")
 inherit_value(initdir	    "${SYSCONF_INSTALL_DIR}/init.d")
+inherit_value(systemdunitdir "/lib/systemd/system")
 
 # Add sub-directories
 add_subdirectory(src)

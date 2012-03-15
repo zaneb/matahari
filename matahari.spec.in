@@ -292,7 +292,7 @@ QMF console for monitoring various agents
 %setup -q -n matahari-matahari-%{upstream_version}
 
 %build
-%{cmake} -DCMAKE_BUILD_TYPE=RelWithDebInfo %{!?with_qmf: -DWITH-QMF:BOOL=OFF} %{!?with_dbus: -DWITH-DBUS:BOOL=OFF} -Dinitdir=%{_initddir} -Dsysconfdir=%{_sysconfdir} .
+%{cmake} -DCMAKE_BUILD_TYPE=RelWithDebInfo %{!?with_qmf: -DWITH-QMF:BOOL=OFF} %{!?with_dbus: -DWITH-DBUS:BOOL=OFF} -Dinitdir=%{_initddir} -Dsysconfdir=%{_sysconfdir} -Dsystemdunitdir=%{_unitdir} .
 make -f Makefile %{?_smp_mflags}
 %if %{defined run_unit_tests}
 cd src/tests && ctest -V

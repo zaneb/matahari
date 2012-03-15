@@ -68,9 +68,6 @@ check_function_exists (time HAVE_TIME)
 ## Modules
 # systemd
 pkg_check_modules(systemd systemd)
-if(systemd_FOUND)
-    set(systemdunitdir "/lib/systemd/system")
-endif(systemd_FOUND)
 
 # pcre
 pkg_check_modules(pcre REQUIRED libpcre)
