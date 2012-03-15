@@ -178,6 +178,19 @@ Requires:       %{name}-python = %{version}-%{release}
 %description shell
 Interactive shell for accessing Matahari agents
 
+%package dbus-bridge
+License:        GPLv2+
+Summary:        QMF agent that bridges to D-Bus
+Group:          Applications/System
+Requires:       %{name}-lib = %{version}-%{release}
+Requires:       %{name}-agent-lib = %{version}-%{release}
+Requires(post): chkconfig
+Requires(preun):chkconfig
+Requires(preun):initscripts
+
+%description dbus-bridge
+QMF agent for interacting with D-Bus objects on the system
+
 %package host
 License:        GPLv2+
 Summary:        QMF agent for remote hosts
@@ -292,6 +305,7 @@ make DESTDIR=%{buildroot} -f Makefile install
 %if %{systemd}
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-service
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-network
+rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-dbus-bridge
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-host
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-rpc
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-sysconfig
@@ -310,6 +324,28 @@ rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/matahari-vios-proxy-guest
 /sbin/ldconfig
 
 %if %{with qmf}
+#== D-Bus Bridge
+
+%post dbus-bridge
+%if %{systemd}
+systemctl --system daemon-reload
+%else
+/sbin/chkconfig --add matahari-dbus-bridge
+%endif
+
+%preun dbus-bridge
+if [ $1 = 0 ]; then
+   /sbin/service matahari-dbus-bridge stop >/dev/null 2>&1 || :
+%if !%{systemd}
+   chkconfig --del matahari-dbus-bridge
+%endif
+fi
+
+%postun dbus-bridge
+if [ "$1" -ge "1" ]; then
+    /sbin/service matahari-dbus-bridge condrestart >/dev/null 2>&1 || :
+fi
+
 #== Host
 
 %post host
@@ -543,6 +579,22 @@ test "x%{buildroot}" != "x" && rm -rf %{buildroot}
 %{python_sitelib}/matahari/shell/interpreter/*.py
 %{python_sitelib}/matahari/shell/interpreter/*.pyc
 %{python_sitelib}/matahari/shell/interpreter/*.pyo
+
+%files dbus-bridge
+%defattr(644, root, root, 755)
+%doc AUTHORS COPYING
+
+%if %{systemd}
+%{_unitdir}/matahari-dbus-bridge.service
+%endif
+
+%if %{with qmf}
+%if !%{systemd}
+%attr(755, root, root) %{_initddir}/matahari-dbus-bridge
+%endif
+%attr(755, root, root) %{_sbindir}/matahari-qmf-dbus-bridged
+%{_mandir}/man8/matahari-qmf-dbus-bridged.8*
+%endif
 
 %files network
 %defattr(644, root, root, 755)
