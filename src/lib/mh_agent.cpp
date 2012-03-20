@@ -34,9 +34,6 @@
 #include <stdlib.h>
 #include <cstdlib>
 
-#include <qpid/sys/Time.h>
-#include <qpid/agent/ManagementAgent.h>
-#include <qpid/client/ConnectionSettings.h>
 #include <qmf/DataAddr.h>
 #include <qmf/Schema.h>
 #include <qmf/SchemaProperty.h>
@@ -58,8 +55,6 @@ extern "C" {
 }
 #endif
 
-using namespace qpid::management;
-using namespace qpid::client;
 using namespace std;
 
 typedef qpid::types::Variant::Map OptionsMap;

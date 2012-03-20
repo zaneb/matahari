@@ -26,8 +26,6 @@
 #define __MATAHARI_DAEMON_H
 
 #include <string>
-#include <qpid/sys/Time.h>
-#include <qpid/agent/ManagementAgent.h>
 #include <qpid/management/Manageable.h>
 #include <qpid/messaging/Connection.h>
 #include <qmf/AgentEvent.h>

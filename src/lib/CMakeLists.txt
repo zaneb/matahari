@@ -56,7 +56,7 @@ if(WITH-QMF)
     add_library (mcommon_qmf SHARED mh_agent.cpp mh_object.cpp)
     set_target_properties(mcommon_qmf PROPERTIES SOVERSION 1.0.0)
 
-    target_link_libraries(mcommon_qmf mcommon ${QPIDCOMMON_LIBRARY}
+    target_link_libraries(mcommon_qmf mcommon
         ${QPIDCLIENT_LIBRARY} ${QPIDMESSAGING_LIBRARY} ${QMF2_LIBRARY}
         ${nss_LIBRARIES})
     if(QPIDTYPES_LIBRARY)
