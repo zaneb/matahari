@@ -4,7 +4,7 @@ After=syslog.target
 Requires=syslog.target
 
 [Install]
-WantedBy=multi-user.target
+#WantedBy=multi-user.target
 
 [Service]
 Type=simple

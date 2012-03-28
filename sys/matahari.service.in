@@ -4,7 +4,7 @@ After=syslog.target network.target matahari-broker.service
 Requires=syslog.target network.target
 
 [Install]
-WantedBy=multi-user.target
+#WantedBy=multi-user.target
 
 [Service]
 Type=simple
