@@ -472,12 +472,11 @@ services_os_set_exec(svc_action_t *op)
         op->opaque->args[3] = NULL;
 
     } else {
-        if (asprintf(&op->opaque->exec, "%s/%s", LSB_ROOT, op->agent) == -1) {
-            return;
-        }
+        op->opaque->exec = strdup("/sbin/service");
         op->opaque->args[0] = strdup(op->opaque->exec);
-        op->opaque->args[1] = strdup(op->action);
-        op->opaque->args[2] = NULL;
+        op->opaque->args[1] = strdup(op->agent);
+        op->opaque->args[2] = strdup(op->action);
+        op->opaque->args[3] = NULL;
     }
 }
 
